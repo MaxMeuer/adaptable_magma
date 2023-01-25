@@ -1,4 +1,5 @@
 import torch
+from einops import rearrange
 
 
 def _get_xps(z, len_numerator, len_denominator):
@@ -10,19 +11,33 @@ def _get_xps(z, len_numerator, len_denominator):
     return torch.stack(xps, 1)
 
 
-def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator, training):
+def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
     # P(X) / Q(X) = a_0 + a_1 * X + ... + a_n * X^n /
     #               1 + | b_1 * X | + | b_2 * X^2| + ... + | b_m * X ^m|
 
-    z = x.view(-1)
     len_num, len_deno = len(weight_numerator), len(weight_denominator)
-    # xps = torch.vander(z, max(len_num, len_deno), increasing=True)
-    xps = _get_xps(z, len_num, len_deno)
-    numerator = xps.mul(weight_numerator).sum(1)
-    expanded_dw = torch.cat([torch.tensor([1.]), weight_denominator, \
-                             torch.zeros(len_num - len_deno - 1)])
-    denominator = xps.mul(expanded_dw).abs().sum(1)
-    return numerator.div(denominator).view(x.shape)
+    pre = torch.tensor([1.]).to(
+        device=x.device, dtype=x.dtype)  # .half()
+    post = torch.zeros(len(weight_numerator) -
+                       len(weight_denominator) - 1).to(device=x.device, dtype=x.dtype)
+
+    z = x.view(-1)
+    singles = z.view(z.shape[-1], 1)
+    pre_vander = singles.repeat(1, max(len_num, len_deno))
+    pows = torch.arange(0, max(len_num, len_deno),
+                        device=x.device, dtype=x.dtype)
+    vander = torch.pow(pre_vander, pows)
+    numerator = torch.mul(vander, weight_numerator).sum(-1)
+
+    expanded_dw = torch.cat([pre, weight_denominator, post])
+
+    denominator = torch.mul(vander, expanded_dw).abs().sum(-1)
+
+    flat_out = torch.div(numerator, denominator)
+
+    out = flat_out.view(x.shape)
+
+    return out
 
 
 def Rational_PYTORCH_B_F(x, weight_numerator, weight_denominator, training):
@@ -62,7 +77,7 @@ def Rational_PYTORCH_D_F(x, weight_numerator, weight_denominator, training, rand
     numerator = xps.mul(weight_numerator.mul(
         torch.FloatTensor(len_num).uniform_(1-random_deviation,
                                             1+random_deviation))
-                       ).sum(1)
+                        ).sum(1)
     denominator = xps[:, 1:len_deno+1].mul(weight_denominator).sum(1).abs()
     return numerator.div(1 + denominator).view(x.shape)
 
@@ -96,7 +111,8 @@ def Rational_Spline_F(x, k, weight_numerator, weight_denominator, training):
     z = x.view(-1)
     len_num, len_deno = len(weight_numerator), len(weight_denominator)
     xps = _get_xps(z, len_num, len_deno).to(weight_numerator.device)
-    numerator = (xps[:, :len_num].mul(weight_numerator).sum(1)).mul(torch.relu(z+k)).mul(-torch.relu(-z+k))
+    numerator = (xps[:, :len_num].mul(weight_numerator).sum(1)
+                 ).mul(torch.relu(z+k)).mul(-torch.relu(-z+k))
     denominator = xps[:, 1:len_deno+1].mul(weight_denominator).sum(1).abs()
     return numerator.div(1 + denominator).view(x.shape)
 
@@ -117,4 +133,5 @@ class Rational_CUDA_NONSAFE_F():
         pass
 
     def apply():
+
         return Rational_NONSAFE_F

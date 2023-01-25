@@ -1,3 +1,14 @@
+# %%
+from rtpt import RTPT
+from functools import partial
+from tqdm import tqdm
+from torch.optim import AdamW
+from pathlib import Path
+from magma.config import MultimodalConfig
+from torch.utils.data import random_split, ConcatDataset
+
+import wandb
+import deepspeed
 from magma.train_loop import (
     eval_step,
     inference_step,
@@ -13,6 +24,7 @@ from magma.utils import (
     load_model,
     print_main,
     configure_param_groups,
+    cast_dtype
 )
 from magma.magma import (
     Magma,
@@ -22,21 +34,7 @@ from magma.datasets import (
     ImgCptDataset,
 )
 import torch
-import torch.nn as nn
 import os
-
-import deepspeed
-import wandb
-from torch.utils.data import random_split, ConcatDataset
-from magma.config import MultimodalConfig
-from pathlib import Path
-from torch.optim import AdamW
-from tqdm import tqdm
-from functools import partial
-from rtpt import RTPT
-rtpt = RTPT(name_initials='MM',
-            experiment_name='Debugging OOMem Issues in Deepspeed. Do not Enter if you want your process to live :)', max_iterations=300)
-rtpt.start()
 
 
 def _load_img_cpt_datasets(dataset_dir, tokenizer, transforms):
@@ -89,11 +87,16 @@ if __name__ == "__main__":
         config = MultimodalConfig.from_yml(
             args.config
         )
+    if config.dtype:
+        dtype = cast_dtype(config.dtype)
+        # torch.set_default_dtype(dtype)
 
     if config.from_checkpoint:
         print("FROM CHECKPOINT")
+
+        print(config.magma_checkpoint_path)
         model = Magma.from_checkpoint(
-            args.config, './model_checkpoints/multimodal_transformer_rn50x16/global_step150/mp_rank_00_model_states.pt')
+            args.config, config.magma_checkpoint_path)
     else:
         model = Magma(
             args.config,
@@ -109,9 +112,6 @@ if __name__ == "__main__":
         config, tokenizer, transforms
     )
 
-    # l = [print(module) for module in model.modules()
-    #      if not isinstance(module, nn.Sequential)]
-
     print_main(f"Loaded train dataset with {len(train_dataset)} samples")
     print_main(f"Loaded eval dataset with {len(eval_dataset)} samples")
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
         config.lr,
         betas=(0.9, 0.95),
         weight_decay=config.weight_decay,
-        eps=1e-03
+        eps=1.0e-4
     )
 
     model_engine, opt, train_loader, lr_scheduler = deepspeed.initialize(
@@ -163,10 +163,9 @@ if __name__ == "__main__":
         name=config.name or wandb.util.generate_id(),
         config=config,
     )
-
+# %%
     # training loop
     for i in pbar:
-        rtpt.step()
         if global_step >= config.train_steps:
             break
 
@@ -184,54 +183,39 @@ if __name__ == "__main__":
                 if lr_scheduler is not None
                 else config.lr
             )
-            # for name, param in list(model.named_parameters()):
-            #     if 'switch' in name:
-            #         logit1 = param
-            #         break
-            # sd = model.state_dict()
-            for name, param in model.named_parameters():
-                if name == 'lm.transformer.h.0.mlp.1.switch_logits':
-                    switch = param[0].item()
-                if "switch_logits" in name: 
-                    last_switch = param[0].item()
-                # if name == 'image_prefix.enc.layer1.0.relu1.numerator':
-                #     relu = param[0].item()
-
-            # print('switch', switch)
-            # print('relu', relu)
-            to_log = {"train/loss": loss, "train/lr": current_lr,
-                      'first_Switch_logit': switch,'last_Switch': last_switch }
-            # to_log = {"train/loss": loss, "train/lr": current_lr,
-            #           'first_Switch_logit': switch, 'first_relu_weight_image_encoder': relu}
+            to_log = {"train/loss": loss, "train/lr": current_lr}
             wandb_log(to_log, step=global_step)
 
-        # ##### Evaluation phase
-        # if global_step % config.eval_every == 0:
-        #     model_engine.eval()
-        #     with torch.no_grad():
+        # Evaluation phase
+        if global_step % config.eval_every == 0:
+            model_engine.eval()
+            with torch.no_grad():
 
-        #         ##### eval step:
-        #         eval_loss = eval_step(config, eval_loader, model_engine, device=torch.device("cuda", args.local_rank))
+                # eval step:
+                eval_loss = eval_step(
+                    config, eval_loader, model_engine, device=torch.device("cuda", args.local_rank))
 
-        #         wandb_log({"eval/loss": eval_loss}, step=global_step)
-        #         pbar.set_description(
-        #             f"evaluating... Step: {global_step} Eval Loss: {eval_loss}"
-        #         )
+                wandb_log({"eval/loss": eval_loss}, step=global_step)
+                pbar.set_description(
+                    f"evaluating... Step: {global_step} Eval Loss: {eval_loss}"
+                )
 
-        #         ##### inference:
-        #         image_grid, caption = inference_step(config, eval_loader, model_engine)
-        #         wandb_log(
-        #             {"inference/image": wandb.Image(image_grid, caption=caption)},
-        #             step=global_step,
-        #         )
+                # inference:
+                image_grid, caption = inference_step(
+                    config, eval_loader, model_engine)
+                wandb_log(
+                    {"inference/image": wandb.Image(image_grid,
+                                                    caption=caption)},
+                    step=global_step,
+                )
 
-        #     model_engine.train()
+            model_engine.train()
 
-        # ##### Save model
-        # if global_step % config.save_every == 0:
-        #     if config.save is not None:
-        #         save_model(model_engine, config.save, global_step)
-        #         print_main(f"saving model at step {global_step}")
+        # Save model
+        if global_step % config.save_every == 0:
+            if config.save is not None:
+                save_model(model_engine, config.save, global_step)
+                print_main(f"saving model at step {global_step}")
 
     # Save model after training is finished
     if config.save is not None:

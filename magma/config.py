@@ -64,9 +64,16 @@ class MultimodalConfig:
     tokenizer_name: str = "gpt2"
     lm_name: str = "EleutherAI/gpt-j-6B"
     from_checkpoint: bool = False
+    magma_checkpoint_path: str = None
     image_seq_len: int = 2
     pretrained_img_encoder: bool = False
     seq_len: int = None
+    perceiver: bool = False
+    dtype: str = "float32"
+
+    # Layer Freezing settings:
+    # ------------------------------------------------------------
+    cross_attention_config: dict = None
 
     # Layer Freezing settings:
     # ------------------------------------------------------------
@@ -134,6 +141,9 @@ class MultimodalConfig:
             "zero_optimization": {
                 "stage": self.zero_stage,
                 "load_from_fp32_weights": False,
+                # "offload_optimizer": {
+                #     "device": "cpu",
+                # },
             },
 
         }

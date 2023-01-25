@@ -1,7 +1,8 @@
 import torch
-from transformers import GPTNeoForCausalLM, AutoConfig, GPT2LMHeadModel
+from transformers import GPTNeoForCausalLM, AutoConfig, GPT2LMHeadModel, AutoModelForCausalLM
 from .utils import print_main
 from pathlib import Path
+
 from transformers.modeling_utils import no_init_weights
 
 LANGUAGE_MODELS = [
@@ -10,7 +11,10 @@ LANGUAGE_MODELS = [
 
 
 def gptj_config():
+    # config = AutoConfig.from_pretrained(
+    #     "/home/ml-mmeuer/adaptable_magma/model_checkpoints/gpt-neo-1.3B", local_files_only=True)
     config = AutoConfig.from_pretrained("EleutherAI/gpt-neo-2.7B")
+
     config.attention_layers = ["global"] * 28
     config.attention_types = [["global"], 28]
     config.num_layers = 28
