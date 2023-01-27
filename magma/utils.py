@@ -403,7 +403,7 @@ def freeze_rational_clip(enc):
             for seq_child in child.children():
                 if isinstance(seq_child, Bottleneck):
                     for bot_params in seq_child.children():
-                        if isinstance(bot_params, (Rational)):
+                        if isinstance(bot_params, (Rational, torch.nn.BatchNorm2d)):
                             for param in bot_params.parameters():
                                 param.requires_grad = True
                         else:

@@ -87,10 +87,10 @@ class Rational(ActivationModule, Rational_base):
         w_numerator, w_denominator = get_parameters(version, degrees,
                                                     approx_func)
 
-        self.numerator = nn.Parameter(torch.tensor(w_numerator, dtype=torch.float16),
+        self.numerator = nn.Parameter(torch.tensor(w_numerator, dtype=torch.float32),
                                       requires_grad=trainable and train_numerator)
 
-        self.denominator = nn.Parameter(torch.tensor(w_denominator, dtype=torch.float16),
+        self.denominator = nn.Parameter(torch.tensor(w_denominator, dtype=torch.float32),
                                         requires_grad=trainable and train_denominator)
 
         self.register_parameter("numerator", self.numerator)
