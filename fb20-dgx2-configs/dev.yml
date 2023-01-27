@@ -8,13 +8,13 @@
     # image encoder settings
     encoder_name: 'clip_resnet_large',
     freeze_img_encoder: False,
-    rational_image_encoder: False,
+    rational_image_encoder: True,
 
     # adapter settings
     # adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4}, "adapter_switch": True, "hidden_act": "rational:relu" },
 
     # train settings 
-    batch_size: 4,
+    batch_size: 1,
     train_steps: 500,
     lr: 1.0e-7,
     min_lr: 0.0,
