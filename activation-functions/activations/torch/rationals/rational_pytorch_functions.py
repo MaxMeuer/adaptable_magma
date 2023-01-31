@@ -18,20 +18,25 @@ def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
     len_num, len_deno = len(weight_numerator), len(weight_denominator)
 
     post = torch.zeros(len(weight_numerator) -
-                       len(weight_denominator)).to(device=x.device, dtype=torch.float32)
-
+                       len(weight_denominator) - 1).to(device=x.device, dtype=x.dtype)
+    
+    pre = torch.ones(1).to(device=x.device, dtype=x.dtype)
     z = x.view(-1)
     singles = z.view(z.shape[-1], 1)
     pre_vander = singles.repeat(1, max(len_num, len_deno))
+    
     pows = torch.arange(0, max(len_num, len_deno),
                         device=x.device, dtype=x.dtype)
-    pows = torch.nan_to_num(pre_vander, nan=0, posinf=torch.finfo(
-        x.dtype).max, neginf=torch.finfo(x.dtype).min)
+    
     vander = torch.pow(pre_vander, pows)
+    vander = torch.nan_to_num(vander, nan=0, posinf=torch.finfo(
+        x.dtype).max, neginf=torch.finfo(x.dtype).min)
+
 
     numerator = torch.mul(vander, weight_numerator).sum(-1)
 
-    expanded_dw = torch.cat([weight_denominator, post])
+
+    expanded_dw = torch.cat([pre,weight_denominator, post])
 
     denominator = torch.mul(vander, expanded_dw).abs().sum(-1)
 
