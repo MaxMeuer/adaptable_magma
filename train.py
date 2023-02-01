@@ -206,11 +206,11 @@ if __name__ == "__main__":
 
                 # inference:
                 # image_grid, caption = inference_step(
-                #     config, eval_loader, model_engine)
+                #    config, eval_loader, model_engine)
                 # wandb_log(
-                #     {"inference/image": wandb.Image(image_grid,
-                #                                     caption=caption)},
-                #     step=global_step,
+                #    {"inference/image": wandb.Image(image_grid,
+                #                                    caption=caption)},
+                #    step=global_step,
                 # )
 
             model_engine.train()
