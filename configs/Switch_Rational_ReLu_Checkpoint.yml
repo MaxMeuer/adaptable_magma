@@ -30,7 +30,7 @@
     image_embed_dropout_prob: 0.1,
     image_size: 384,
 
-    gradient_accumulation_steps: 8,
+    gradient_accumulation_steps: 4,
     zero_stage: 2,
     gradient_clipping: 1.0,
 
@@ -56,8 +56,9 @@
     eval_dataset_dir: Null,
 
     save: "/nfs/scratch/bjoern_checkpoint/magma_ablation/switch_llm_relu_checkpoint",
-    #load: "/mnt/shared_vol/checkpoints/multimodal_transformer_rn50x16",
+    magma_checkpoint_path: "/nfs/scratch/bjoern/adaptadapt/magma/mp_rank_00_model_states.pt",
     wandb_project: "magma_ablations",
 
     eval_every: 250,
+    save_every: 250,
 }
