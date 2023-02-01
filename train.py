@@ -187,7 +187,7 @@ if __name__ == "__main__":
             wandb_log(to_log, step=global_step)
 
         # Evaluation phase
-        if global_step % config.eval_every == 0:
+        if False and (global_step % config.eval_every == 0):
             model_engine.eval()
             with torch.no_grad():
 
