@@ -27,7 +27,7 @@
     image_embed_dropout_prob: 0.1,
     image_size: 384,
 
-    gradient_accumulation_steps: 8,
+    gradient_accumulation_steps: 4,
     zero_stage: 2,
     gradient_clipping: 1.0,
 
@@ -57,4 +57,5 @@
     wandb_project: "magma_ablations",
 
     eval_every: 250,
+    save_every: 250,
 }
