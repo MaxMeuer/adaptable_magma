@@ -27,7 +27,7 @@
     image_embed_dropout_prob: 0.1,
     image_size: 384,
 
-    gradient_accumulation_steps: 8,
+    gradient_accumulation_steps: 4,
     zero_stage: 2,
     gradient_clipping: 1.0,
 
@@ -47,7 +47,7 @@
         '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/okvqa_train_converted/okvqa_train_converted_index_dataset'
         ],
 
-    train_micro_batch_size_per_gpu: 8,
+    train_micro_batch_size_per_gpu: 4,
     #eval_dataset_name: 'coco',
     #eval_dataset_dir: '/mnt/localdisk/coco_data',
     eval_dataset_dir: Null,
