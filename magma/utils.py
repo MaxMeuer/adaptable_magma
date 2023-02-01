@@ -419,6 +419,6 @@ def freeze_rational_clip(enc):
 
 
 def write_tensorboard(model, writer, step):
-    for _, module in model.named_modules():
+    for name, module in model.named_modules():
         if isinstance(module, Rational):
-            module.show_all(writer=writer, step=step)
+            module.show(writer=writer, step=step, title=name)
