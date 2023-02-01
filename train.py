@@ -6,6 +6,7 @@ from torch.optim import AdamW
 from pathlib import Path
 from magma.config import MultimodalConfig
 from torch.utils.data import random_split, ConcatDataset
+from tensorboardX import SummaryWriter
 
 import wandb
 import deepspeed
@@ -24,7 +25,8 @@ from magma.utils import (
     load_model,
     print_main,
     configure_param_groups,
-    cast_dtype
+    cast_dtype,
+    write_tensorboard,
 )
 from magma.magma import (
     Magma,
@@ -90,7 +92,7 @@ if __name__ == "__main__":
     if config.dtype:
         dtype = cast_dtype(config.dtype)
         # torch.set_default_dtype(dtype)
-
+    writer = SummaryWriter()
     if config.from_checkpoint:
         print("FROM CHECKPOINT")
 
@@ -99,7 +101,7 @@ if __name__ == "__main__":
             args.config, config.magma_checkpoint_path)
     else:
         model = Magma(
-            args.config,
+            args.config
         )
 
     tokenizer, config, transforms = model.tokenizer, model.config, model.transforms
@@ -191,23 +193,25 @@ if __name__ == "__main__":
             model_engine.eval()
             with torch.no_grad():
 
+                write_tensorboard(model, writer, step=global_step)
                 # eval step:
                 eval_loss = eval_step(
                     config, eval_loader, model_engine, device=torch.device("cuda", args.local_rank))
-
-                wandb_log({"eval/loss": eval_loss}, step=global_step)
                 pbar.set_description(
-                    f"evaluating... Step: {global_step} Eval Loss: {eval_loss}"
-                )
+                    f"eval... Step: {global_step} Loss: {eval_loss}")
+                # wandb_log({"eval/loss": eval_loss}, step=global_step)
+                # pbar.set_description(
+                #     f"evaluating... Step: {global_step} Eval Loss: {eval_loss}"
+                # )
 
                 # inference:
-                image_grid, caption = inference_step(
-                    config, eval_loader, model_engine)
-                wandb_log(
-                    {"inference/image": wandb.Image(image_grid,
-                                                    caption=caption)},
-                    step=global_step,
-                )
+                # image_grid, caption = inference_step(
+                #     config, eval_loader, model_engine)
+                # wandb_log(
+                #     {"inference/image": wandb.Image(image_grid,
+                #                                     caption=caption)},
+                #     step=global_step,
+                # )
 
             model_engine.train()
 

@@ -16,6 +16,7 @@ class Activation_Function_Class(nn.Module):
     def __init__(self, hidden_act):
         super().__init__()
         local_rank, rank, world_size = get_world_info()
+
         if hidden_act.lower() == "relu":
             self.f = nn.functional.relu
         elif hidden_act.lower() == "tanh":
@@ -93,6 +94,7 @@ class Adapter(nn.Module):
         fixed_idx: int = None,
 
     ):
+
         super().__init__()
         layers = []
         if add_layernorm:
@@ -205,10 +207,17 @@ class ParallelAdapterWrapper(ParallelAdapter):
         downsample_factor: int = 4,
         scaled: bool = False,
         add_layernorm: bool = False,
-        activation: nn.Module = nn.ReLU
+        hidden_activation: nn.Module = nn.ReLU,
+        adapter_switch: bool = False,
     ):
         super().__init__(
-            module, dim, downsample_factor, scaled, add_layernorm, activation
+            module,
+            dim=dim,
+            downsample_factor=downsample_factor,
+            scaled=scaled,
+            add_layernorm=add_layernorm,
+            hidden_activation=hidden_activation,
+            adapter_switch=adapter_switch
         )
 
     def forward(self, x: TensorType["b", "s", "d"], *attn_args, **attn_kwargs):
@@ -229,11 +238,19 @@ class AdapterWrapper(Adapter):
         attn_block: nn.Module,
         dim: int,
         downsample_factor: int = 4,
-        activation: nn.Module = nn.ReLU,
+        hidden_activation: nn.Module = nn.ReLU,
+        adapter_switch: bool = False,
         add_layernorm: bool = False,
 
     ):
-        super().__init__(dim, downsample_factor, activation, add_layernorm)
+        super().__init__(
+            dim=dim,
+            downsample_factor=downsample_factor,
+            add_layernorm=add_layernorm,
+            hidden_activation=hidden_activation,
+            adapter_switch=adapter_switch
+        )
+
         self.attn_block = attn_block
 
     def forward(self, x: TensorType["b", "s", "d"], *attn_args, **attn_kwargs):

@@ -416,3 +416,9 @@ def freeze_rational_clip(enc):
             for param in child.parameters():
                 param.requires_grad = False
     return enc
+
+
+def write_tensorboard(model, writer, step):
+    for _, module in model.named_modules():
+        if isinstance(module, Rational):
+            module.show_all(writer=writer, step=step)

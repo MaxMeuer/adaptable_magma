@@ -31,7 +31,6 @@ import inspect
 class Magma(nn.Module):
     def __init__(self, config):
         super().__init__()
-
         if isinstance(config, (str, Path)):
             config = MultimodalConfig.from_yml(
                 config
@@ -201,6 +200,7 @@ class Magma(nn.Module):
                         dim=self.lm.config.hidden_size,
                         downsample_factor=downsample_factor,
                         scaled="scaled" in adapter_type,
+
                         **adapter_kwargs,
                     )
                 else:
@@ -208,6 +208,10 @@ class Magma(nn.Module):
                         attn_block=attn,
                         dim=self.lm.config.hidden_size,
                         downsample_factor=downsample_factor,
+                        hidden_act=self.config.adapter_config.get(
+                            'hidden_act', False),
+                        adapter_switch=self.config.adapter_config.get(
+                            'adapter_switch', False),
                         **adapter_kwargs,
                     )
                 setattr(self.transformer[l], attn_attr, adapter_layer)
