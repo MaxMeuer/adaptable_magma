@@ -8,3 +8,4 @@ termcolor
 setuptools>=49.4.0
 # tensorflow>=2.0.0
 mxnet-cu102==1.7.0
+airspeed==0.5.17

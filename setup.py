@@ -25,7 +25,7 @@ setuptools.setup(
     url="https://github.com/Aleph-Alpha/magma",
     packages=setuptools.find_packages(),
     install_requires=required,
-    python_requires=">=3.9",
+    #python_requires=">=3.9",
     include_package_data=True,
     classifiers=[
         "Natural Language :: English",

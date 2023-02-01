@@ -46,7 +46,7 @@ class MultimodalConfig:
 
     # Checkpointing:
     # ------------------------------------------------------------
-    save_every: int = 2500
+    save_every: int = 500
     save: str = None
     load: str = None
 

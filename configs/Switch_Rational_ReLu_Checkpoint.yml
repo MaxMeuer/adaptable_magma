@@ -35,13 +35,29 @@
     gradient_clipping: 1.0,
 
     # dataset / save / load settings
-    train_dataset_name: "conceptual_captions",
-    train_dataset_dir: "/mnt/localdisk/conceptual_captions",
-    eval_dataset_name: "coco",
-    eval_dataset_dir: "/mnt/localdisk/coco_data",
+    train_dataset_name: 'scrambled_eggs',
+    #train_dataset_dir: '/mnt/localdisk/conceptual_captions',
+    train_dataset_dir: [
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/laion/laion_index_dataset',
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/CC3M_converted/CC3M_converted_index_dataset',
+        ##'/mnt/localdisk/localized_narratives',
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/visual_genome_converted/visual_genome_converted_index_dataset',
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/hateful_memes_converted/hateful_memes_converted_index_dataset',
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/coco_converted/coco_converted_index_dataset',
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/wit_converted/wit_converted_index_dataset',
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/gqa_train_converted/gqa_train_converted_index_dataset',
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/vqa_train_converted/vqa_train_converted_index_dataset',
+        '/pfss/alephalpha/datasets-tokenized/aa-data-multimodal-large-tokenized/okvqa_train_converted/okvqa_train_converted_index_dataset'
+        ],
 
-    save: "/mnt/shared_vol/checkpoints/multimodal_transformer_rn50x16",
-    load: "/mnt/shared_vol/checkpoints/multimodal_transformer_rn50x16",
+    train_micro_batch_size_per_gpu: 4,
+    #eval_dataset_name: 'coco',
+    #eval_dataset_dir: '/mnt/localdisk/coco_data',
+    eval_dataset_dir: Null,
 
-    eval_every: 100,
+    save: "/nfs/scratch/bjoern_checkpoint/magma_ablation/switch_llm_relu_checkpoint",
+    #load: "/mnt/shared_vol/checkpoints/multimodal_transformer_rn50x16",
+    wandb_project: "magma_ablations",
+
+    eval_every: 250,
 }

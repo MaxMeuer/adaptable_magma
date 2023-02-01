@@ -102,9 +102,10 @@ def inference_step(config, eval_loader, model_engine):
     images = images.cuda()  # .half()
     if config.run_blind:
         images = torch.zeros_like(images)
-    captions = model_engine(
-        images, captions=None, inference=True
-    )  # [caption1, caption2, ... b]
+    captions = model_engine.generate(model_engine.image_prefix(images))
+    #captions = model_engine(
+    #    images, captions=None, #inference=True
+    #)  # [caption1, caption2, ... b]
     width = min(2, images.shape[0])
     image_grid = make_grid(images[:width])
     caption = ""

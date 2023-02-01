@@ -88,7 +88,7 @@ class Adapter(nn.Module):
         hidden_act: str = "relu",
         add_layernorm: bool = False,
         adapter_switch: bool = False,
-        initial_logits: list[float] = [0.5, 0.5],
+        initial_logits= [0.5, 0.5], #: list[float] = [0.5, 0.5],
         initial_temperature: float = 0.1,
         fixed_idx: int = None,
 
