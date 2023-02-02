@@ -117,9 +117,11 @@ def load_model(
     try:
         load_path, sd = model_engine.load_checkpoint(
             load_dir,
+            load_module_strict=False,
             load_optimizer_states=load_optimizer_states,
             load_lr_scheduler_states=load_lr_scheduler_states,
         )
+
     except AssertionError as e:
         load_path = None
         print(e)
@@ -419,6 +421,11 @@ def freeze_rational_clip(enc):
 
 
 def write_tensorboard(model, writer, step):
+    all = False
     for name, module in model.named_modules():
         if isinstance(module, Rational):
             module.show(writer=writer, step=step, title=name)
+            if not all:
+                module.show_all(writer=writer, step=step,
+                                title='All Rational Modules')
+                all = True

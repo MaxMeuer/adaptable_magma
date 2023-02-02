@@ -22,16 +22,16 @@ def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
     z = x.view(-1)
     singles = z.view(z.shape[-1], 1)
     pre_vander = singles.repeat(
-        1, max(len_num, len_deno)).to(dtype=torch.float64)
+        1, max(len_num, len_deno)).to(dtype=x.dtype)
 
     pows = torch.arange(0, max(len_num, len_deno),
-                        device=x.device, dtype=torch.float64)
+                        device=x.device, dtype=x.dtype)
     vander = torch.pow(pre_vander, pows)
 
     # print('vander', vander.isnan().any() or vander.isinf().any())
     # vander = vander.to(x.dtype)
     vander = torch.nan_to_num(vander, nan=0, posinf=torch.finfo(
-        torch.float64).max, neginf=torch.finfo(torch.float64).min)
+        x.dtype).max, neginf=torch.finfo(x.dtype).min)
 
     numerator = torch.mul(vander, weight_numerator).sum(-1)
 
@@ -43,7 +43,7 @@ def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
     flat_out = torch.div(numerator, denominator)
 
     out = flat_out.view(x.shape).to(dtype=x.dtype)
-    out = out.nan_to_num(vander, nan=0, posinf=torch.finfo(
+    out = torch.nan_to_num(out, nan=0, posinf=torch.finfo(
         x.dtype).max, neginf=torch.finfo(x.dtype).min)
     # out  = torch.nan_to_num(out, nan=0, posinf=torch.finfo(
     #     x.dtype).max, neginf=torch.finfo(x.dtype).min)
