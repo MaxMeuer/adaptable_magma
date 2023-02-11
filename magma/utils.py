@@ -267,9 +267,9 @@ def log_table(name, model_outputs, gt_answers_list, global_step):
 
 
 def get_world_info():
-    local_rank = int(os.environ["LOCAL_RANK"])
-    rank = int(os.environ["RANK"])
-    world_size = int(os.environ["WORLD_SIZE"])
+    local_rank = int(os.environ["LOCAL_RANK"]) if "LOCAL_RANK" in os.environ else None
+    rank = int(os.environ["RANK"]) if "RANK" in os.environ else None
+    world_size = int(os.environ["WORLD_SIZE"]) if "WORLD_SIZE" in os.environ else None
     return local_rank, rank, world_size
 
 
@@ -327,6 +327,7 @@ def infer_checkpoint_path_from_config(config):
 def to_cuda_half(*args):
     cuda_half_args = []
     local_rank, rank, world_size = get_world_info()
+    device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu' 
     for x in args:
         if isinstance(x, list):
             x_cuda_half = to_cuda_half(*x)
@@ -338,7 +339,7 @@ def to_cuda_half(*args):
             if x.dtype in [torch.float32, torch.float16]:
                 # cuda_half_args.append(x.half())
                 cuda_half_args.append(
-                    x.to(torch.device(f'cuda:{local_rank}')).half())
+                    x.to(torch.device(device)).half())
             elif x.dtype == torch.long:
                 # cuda_half_args.append(x)
                 cuda_half_args.append(x.cuda())
@@ -363,11 +364,12 @@ def build_labels(
     """
     shape = input_embeddings.shape[:2]  # b, s
     local_rank, rank, world_size = get_world_info()
+    device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu' 
 
     assert captions.shape[1] >= shape[1]
     # make sure to add masked embedding tokens in the appropriate locations in the labels
     embedding_tokens = torch.zeros(
-        shape, dtype=torch.int64).to(torch.device(f'cuda:{local_rank}')) - 100
+        shape, dtype=torch.int64).to(torch.device(device)) - 100
     labels = torch.cat(
         (embedding_tokens, captions[:, : -shape[1]]), dim=1
     )  # we truncate the sequence length of the captions, as they are always padded to the full sequence length

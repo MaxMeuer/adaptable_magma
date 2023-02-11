@@ -74,7 +74,7 @@ def generate(
 
     # init output with image tokens
     # .to(model.device) + model.image_token
-    out = torch.zeros((b, s), dtype=torch.long) + model.image_token
+    out = torch.zeros((b, s), dtype=torch.long).to(model.device) + model.image_token
 
     # do sampling
     for i in range(max_steps):
@@ -91,7 +91,9 @@ def generate(
                 input_ids=out[:, -1:], use_cache=True, past_key_values=past_key_values
             )
 
+        print('outputs', outputs.logits.device)
         logits = outputs.logits[:, -1, :].float()
+        print('logits', logits.device)
         past_key_values = outputs.past_key_values
 
         # filter / temperature sample

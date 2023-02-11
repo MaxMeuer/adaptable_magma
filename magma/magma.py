@@ -239,7 +239,7 @@ class Magma(nn.Module):
         if embed == True:
             return self.embed(input_list)
         else:
-            return input
+            return input_list
 
     def embed(self, inputs: List[torch.Tensor]) -> TensorType["b", "s", "d"]:
         """

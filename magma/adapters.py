@@ -110,7 +110,7 @@ class Adapter(nn.Module):
         local_rank, rank, world_size = get_world_info()
         self.local_rank = local_rank
         self.adapter_switch = adapter_switch
-        device = f'cuda:{local_rank}'
+        device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu'
         self.device = device
         if adapter_switch:
             self.switch_logits = nn.Parameter(torch.tensor(initial_logits))
