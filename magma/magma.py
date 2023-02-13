@@ -111,7 +111,7 @@ class Magma(nn.Module):
         if config.freeze_lm:
             for name, param in self.lm.named_parameters():  # freeze lm weights
                 if config.adapter_config and not config.adapter_config.get('freeze', False):
-                    if any(map(name.__contains__, ['adapter', 'switch_temp'])):
+                    if any(map(name.__contains__, ['adapter', 'switch_logits'])):
                         param.requires_grad = True
                 else:
                     param.requires_grad = False
