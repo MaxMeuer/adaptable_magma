@@ -21,7 +21,7 @@ from .adapters import (
 )
 from .image_prefix import ImagePrefix
 from .sampling import generate
-from .utils import build_labels, is_url, print_main, download_checkpoint, freeze_rational_clip
+from .utils import build_labels, is_url, print_main, download_checkpoint, freeze_rational_clip, get_world_info
 from .image_input import ImageInput
 from .transforms import get_transforms
 import inspect
@@ -55,9 +55,11 @@ class Magma(nn.Module):
 
         # adapter settings
         self.mlp_adapter_added, self.attn_adapter_added = False, False
+
         self.image_prefix = ImagePrefix(
             config=config,
             # out_dim=4096,
+            device='cpu',
             out_dim=self.lm.config.hidden_size,
         )  # .to(self.device)
 
@@ -80,6 +82,7 @@ class Magma(nn.Module):
                 self.image_prefix.encoder_out_dim,
                 n_latents=config.cross_attention_config['n_latents'],
             )
+
             self.add_cross_attention_modules()
 
         # add adapters
@@ -107,8 +110,9 @@ class Magma(nn.Module):
         # freeze parameters
         if config.freeze_lm:
             for name, param in self.lm.named_parameters():  # freeze lm weights
-                if config.adapter_config and "adapter" in name and not config.adapter_config.get('freeze', False):
-                    param.requires_grad = True
+                if config.adapter_config and not config.adapter_config.get('freeze', False):
+                    if any(map(name.__contains__, ['adapter', 'switch_temp'])):
+                        param.requires_grad = True
                 else:
                     param.requires_grad = False
 
@@ -324,7 +328,7 @@ class Magma(nn.Module):
                     visual_features, media_mask=media_mask)
 
             lm_outputs = self.lm(
-                inputs_embeds=input_embeddings,
+                inputs_embeds=word_embeddings,
                 output_hidden_states=output_hidden_states,
             )
 
