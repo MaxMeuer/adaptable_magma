@@ -83,6 +83,7 @@ class ImagePrefix(nn.Module):
         self, x: TensorType["b", "c", "h", "w"]
     ) -> TensorType["b", "seq", "out_dim"]:
         # pass through image encoder
+        # print(x.shape)
         logits = self.enc(x)
         if self.config.cross_attention_config:
             return logits
