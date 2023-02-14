@@ -1,17 +1,17 @@
 torchtyping
 typeguard
-git+https://github.com/finetuneanon/transformers.git#egg=transformers
+#git+https://github.com/finetuneanon/transformers.git#egg=transformers
+transformers
 gdown
 tqdm
 timm
 git+https://github.com/openai/CLIP.git
 deepspeed
 wandb
-
+accelerate
 
 
 tensorboardx
 rtpt
 datasets==1.11.0
 einops_exts
-
