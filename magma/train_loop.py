@@ -11,10 +11,11 @@ def train_step(config, train_loader, model_engine, scaler):
     losses = []
     # with torch.autograd.set_detexct_anomaly(True):
     local_rank, rank, world_size = get_world_info()
+    device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu'
     for _ in range(config.gradient_accumulation_steps):
         images, captions = next(train_loader)
         images, captions = images.to(  # images.half().to(
-            f'cuda:{local_rank}'), captions.to(f'cuda:{local_rank}')
+            device), captions.to(device)
         if config.run_blind:
             images = torch.zeros_like(images)
 

@@ -45,7 +45,7 @@ class ImagePrefix(nn.Module):
         super().__init__()
         local_rank, rank, world_size = get_world_info()
 
-        self.device = f'cuda:{local_rank}'
+        self.device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu'
         self.config = config
         self.encoder_type = config.encoder_name
 

@@ -11,7 +11,7 @@
     rational_image_encoder: True,
 
     # adapter settings
-    # adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4}, "adapter_switch": True, "hidden_act": "rational:relu" },
+    adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4}, "adapter_switch": True, "hidden_act": "rational:relu" },
 
     # train settings 
     batch_size: 1,

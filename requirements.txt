@@ -7,7 +7,11 @@ timm
 git+https://github.com/openai/CLIP.git
 deepspeed
 wandb
-tensorbaordx
+
+
+
+tensorboardx
 rtpt
 datasets==1.11.0
 einops_exts
+

@@ -89,7 +89,7 @@ class Adapter(nn.Module):
         hidden_act: str = "relu",
         add_layernorm: bool = False,
         adapter_switch: bool = False,
-        initial_logits= [0.5, 0.5], #: list[float] = [0.5, 0.5],
+        initial_logits=[0.5, 0.5],  # : list[float] = [0.5, 0.5],
         initial_temperature: float = 0.1,
         fixed_idx: int = None,
 
@@ -110,15 +110,16 @@ class Adapter(nn.Module):
         local_rank, rank, world_size = get_world_info()
         self.local_rank = local_rank
         self.adapter_switch = adapter_switch
-        device = f'cuda:{local_rank}'
+        device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available(
+        ) else 'cpu'
         self.device = device
         if adapter_switch:
             self.switch_logits = nn.Parameter(torch.tensor(initial_logits))
 
-            self.switch_temp = nn.Parameter(torch.tensor(initial_temperature))
+            self.switch_temp = torch.tensor(initial_temperature)
 
             self.register_parameter("switch_logits", self.switch_logits)
-            self.register_parameter("switch_temp", self.switch_temp)
+
             self.gumbel = torch.distributions.Gumbel(
                 torch.tensor(0.), torch.tensor(1.))
 
