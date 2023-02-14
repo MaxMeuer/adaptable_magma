@@ -6,7 +6,7 @@ from torch.optim import AdamW
 from pathlib import Path
 from magma.config import MultimodalConfig
 from torch.utils.data import random_split, ConcatDataset
-from tensorboardX import SummaryWriter
+#from tensorboardX import SummaryWriter
 
 import wandb
 import deepspeed
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     if config.dtype:
         dtype = cast_dtype(config.dtype)
         # torch.set_default_dtype(dtype)
-    writer = SummaryWriter()
+    #writer = SummaryWriter()
     if config.from_checkpoint:
         print("FROM CHECKPOINT")
 

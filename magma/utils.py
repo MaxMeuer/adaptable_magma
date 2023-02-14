@@ -55,15 +55,26 @@ def get_tokenizer(name="gpt2", sequence_length=2048):
     """
     if name == "gpt2":
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
-        tokenizer.pad_token_id = tokenizer.eos_token
-        tokenizer.padding_side = "right"
-        tokenizer.model_max_length = sequence_length
-        # setup lm settings
-        tokenizer.add_special_tokens(
-            {"cls_token": "<|image|>"}
-        )  # add special image token to tokenizer
     else:
-        raise ValueError(f"Tokenizer {name} not recognized")
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(name)
+        except:
+            raise ValueError(f"Tokenizer {name} not recognized")
+
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+    tokenizer.padding_side = "right"
+    tokenizer.model_max_length = sequence_length
+    # setup lm settings
+    tokenizer.add_special_tokens(
+        {
+            "cls_token": "<|image|>",
+            "pad_token": "</s>",
+            "eos_token": "</s>",
+            "bos_token": "</s>",
+            "unk_token": "</s>",
+        }
+    )  # add special image token to tokenizer
+
     return tokenizer
 
 
@@ -267,9 +278,9 @@ def log_table(name, model_outputs, gt_answers_list, global_step):
 
 
 def get_world_info():
-    local_rank = int(os.environ["LOCAL_RANK"])
-    rank = int(os.environ["RANK"])
-    world_size = int(os.environ["WORLD_SIZE"])
+    local_rank = int(os.environ.get("LOCAL_RANK",0))
+    rank = int(os.environ.get("RANK",0))
+    world_size = int(os.environ.get("WORLD_SIZE",0))
     return local_rank, rank, world_size
 
 

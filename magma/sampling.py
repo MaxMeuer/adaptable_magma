@@ -75,6 +75,7 @@ def generate(
     # init output with image tokens
     # .to(model.device) + model.image_token
     out = torch.zeros((b, s), dtype=torch.long) + model.image_token
+    out = out.cuda()
 
     # do sampling
     for i in range(max_steps):

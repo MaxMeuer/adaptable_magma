@@ -12,7 +12,8 @@ import os
 ENCODER_SEQ_LENS = {
     "clip_resnet": 49,
     "clip_resnet_large": 144,
-    'clip_RN50': 49
+    "clip_resnet_tiny": 9,
+    'clip_RN50': 49,
 }
 
 ENCODER_OUT_DIMS = {
@@ -21,6 +22,7 @@ ENCODER_OUT_DIMS = {
     "clip": 512,
     "clip_resnet": 2560,
     "clip_resnet_large": 3072,
+    "clip_resnet_tiny": 3072,
 }
 
 

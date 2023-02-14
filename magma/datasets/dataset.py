@@ -371,7 +371,7 @@ class ImgCptDataset(Dataset):
         self.load_data_in_memory = load_data_in_memory
         self.few_shot = few_shot
 
-        self.orig_tokenizer = Tokenizer.from_file('/root/bjoern/transformer/tests/files/alpha-001-128k.json')
+        self.orig_tokenizer = Tokenizer.from_file('/root/bjoern/adaptadapt/transformer/tests/files/alpha-001-128k.json')
         self.image_data = MMapIndexedDataset(str(self.data_dir)+'_images')
         self.text_data = MMapIndexedDataset(str(self.data_dir)+'_tokenizer_alpha-001-128k_eng')
 

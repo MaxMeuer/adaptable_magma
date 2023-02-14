@@ -39,11 +39,10 @@ class Magma(nn.Module):
             assert isinstance(config, MultimodalConfig)
         self.config = config
 
-        self.lm = get_gptj()  # .to(self.device)
+        self.lm = get_gptj(config)  # .to(self.device)
         self.seq_len = self.lm.config.max_position_embeddings
 
-        self.tokenizer = get_tokenizer(
-            "gpt2", sequence_length=self.seq_len)
+        self.tokenizer = get_tokenizer(config.tokenizer_name, sequence_length=self.seq_len)
 
         self.image_token = self.tokenizer.cls_token_id
         self.eos_token = self.tokenizer.eos_token_id
@@ -250,10 +249,10 @@ class Magma(nn.Module):
         emb_list = []
         for x in inputs:
             if x.ndim == 2:
-                x = x.cuda().half()
+                x = x.cuda() #.to(self.device) #.half()
                 emb_list.append(self.word_embedding(x))
             elif x.ndim == 4:
-                x = x.cuda().half()
+                x = x.cuda().half() #to(self.device).half()
                 image_embeddings = self.image_prefix(x)
                 emb_list.append(image_embeddings)
             else:

@@ -67,7 +67,7 @@ def clip_encoder(
         name = "RN50x4"
     elif name in ['clip_RN50']:
         name = 'RN50'
-    elif name in ["clip_resnet_large", "RN50x16"]:
+    elif name in ["clip_resnet_large","clip_resnet_tiny", "RN50x16"]:
         name = "RN50x16"
     else:
         raise ValueError(f"encoder {name} not recognized")
