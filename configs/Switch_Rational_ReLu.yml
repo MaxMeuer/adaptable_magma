@@ -13,7 +13,7 @@
     rational_image_encoder: False,
 
     # adapter settings
-    adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4}, "adapter_switch": True, "hidden_act": "rational:relu" },
+    adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4},"initial_temperature":1.0, "adapter_switch": True, "hidden_act": "rational:relu" },
 
 
     # train settings
@@ -24,6 +24,7 @@
     lr_decay_iters: 300000,
     image_enc_lr: 2.0e-6,
     use_image_embed_layernorm: true,
+    switch_lr: 2.0e-9,
     image_embed_dropout_prob: 0.1,
     image_size: 384,
 

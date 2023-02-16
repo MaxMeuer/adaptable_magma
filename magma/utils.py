@@ -58,10 +58,10 @@ def get_tokenizer(name="gpt2", sequence_length=2048):
     if name == "gpt2":
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
     else:
-        # try:
-        tokenizer = AutoTokenizer.from_pretrained(name)
-        # except:
-        #     raise ValueError(f"Tokenizer {name} not recognized")
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(name)
+        except:
+            raise ValueError(f"Tokenizer {name} not recognized")
 
     tokenizer.pad_token_id = tokenizer.eos_token_id
     tokenizer.padding_side = "right"
@@ -152,19 +152,20 @@ def get_params_for_weight_decay_optimization(module, config):
     weight_decay_params = {"params": []}
     no_weight_decay_params = {"params": [], "weight_decay": 0.0}
     blacklist_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
-    names = []
-    for named, module_ in module.named_modules():
+    for module_ in module.modules():
         if isinstance(module_, blacklist_modules) or (
             config.weight_decay == 0.0
         ):  # also include all parameters here if no weight decay is being done
-            if not ('lm_head' in named):
-                for n, p in list(module_._parameters.items()):
-                    if (p is not None) and p.requires_grad:
-                        no_weight_decay_params['params'].append(p)
-                        names.append(named + "." + n)
+            no_weight_decay_params["params"].extend(
+                [
+                    p
+                    for p in list(module_._parameters.values())
+                    if (p is not None) and p.requires_grad
+                ]
+            )
         else:
             for n, p in list(module_._parameters.items()):
-                if (p is not None) and p.requires_grad:
+                if p is not None and p.requires_grad:
                     if n != "bias":
                         weight_decay_params["params"].append(p)
                     else:
@@ -173,7 +174,7 @@ def get_params_for_weight_decay_optimization(module, config):
     param_dict = {
         pn: p
         for pn, p in module.named_parameters()
-        if (not p is None) and p.requires_grad
+        if p is not None and p.requires_grad
     }
 
     assert len(no_weight_decay_params["params"]) + len(
@@ -211,16 +212,21 @@ def configure_param_groups(model, config):
 
     # get the params for the lm
     rationals_list = torch.nn.ParameterList([])
+    switch_list = torch.nn.ParameterList([])
     lm_list = torch.nn.ParameterList([])
     for name, param in model.lm.named_parameters():
-        if any(map(name.__contains__, ['numerator', 'denominator', 'switch_logits'])):
+        if any(map(name.__contains__, ['numerator', 'denominator'])):
             rationals_list.append(param)
+        elif any(map(name.__contains__, ['switch_logits'])):
+            switch_list.append(param)
         else:
             lm_list.append(param)
 
     lm_params = get_params_for_weight_decay_optimization(lm_list, config)
     rationals_params = get_params_for_weight_decay_optimization(
         rationals_list, config)
+    switch_params = get_params_for_weight_decay_optimization(
+        switch_list, config)
 
     if config.image_enc_lr is not None:
         for pdict in image_enc_params:
@@ -230,6 +236,10 @@ def configure_param_groups(model, config):
         for pdict in rationals_params:
             pdict["lr"] = config.rationals_lr
 
+    if config.switch_lr is not None:
+        for pdict in switch_params:
+            pdict["lr"] = config.switch_lr
+
     # get params for class head if it exists
     class_params = []
     if hasattr(model, "class_head") and model.class_head is not None:
@@ -238,7 +248,7 @@ def configure_param_groups(model, config):
         )
 
     all_params = []
-    for p in image_enc_params + lm_params + image_proj_params + rationals_params + class_params:
+    for p in image_enc_params + lm_params + image_proj_params + rationals_params + switch_params + class_params:
         if p["params"]:
             all_params.append(p)
     # else:

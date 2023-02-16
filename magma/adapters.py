@@ -90,7 +90,7 @@ class Adapter(nn.Module):
         add_layernorm: bool = False,
         adapter_switch: bool = False,
         initial_logits=[0.5, 0.5],  # : list[float] = [0.5, 0.5],
-        initial_temperature: float = 0.1,
+        initial_temperature: float = 1.0,
         fixed_idx: int = None,
 
     ):
@@ -218,7 +218,7 @@ class ParallelAdapterWrapper(ParallelAdapter):
             scaled=scaled,
             add_layernorm=add_layernorm,
             hidden_activation=hidden_activation,
-            adapter_switch=adapter_switch
+            adapter_switch=adapter_switch,
         )
 
     def forward(self, x: TensorType["b", "s", "d"], *attn_args, **attn_kwargs):
