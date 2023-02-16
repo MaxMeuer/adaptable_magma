@@ -1,6 +1,6 @@
 import argparse
 import torch.distributed as dist
-from transformers import GPT2TokenizerFast
+from transformers import GPT2TokenizerFast, AutoTokenizer
 import deepspeed
 from pathlib import Path
 import wandb
@@ -13,6 +13,7 @@ from collections import defaultdict
 from torchtyping import TensorType
 import gdown
 import os
+import matplotlib.pyplot as plt
 
 TORCH_DTYPES = {
     'float32': torch.float32,
@@ -38,6 +39,7 @@ def reduce_losses(losses):
         losses = losses.detach().clone()
         # We use `all_reduce` because it is better supported than `reduce`
         dist.all_reduce(losses, dist.ReduceOp.SUM)
+
         return losses / dist.get_world_size()
     else:
         return losses
@@ -56,10 +58,10 @@ def get_tokenizer(name="gpt2", sequence_length=2048):
     if name == "gpt2":
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
     else:
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(name)
-        except:
-            raise ValueError(f"Tokenizer {name} not recognized")
+        # try:
+        tokenizer = AutoTokenizer.from_pretrained(name)
+        # except:
+        #     raise ValueError(f"Tokenizer {name} not recognized")
 
     tokenizer.pad_token_id = tokenizer.eos_token_id
     tokenizer.padding_side = "right"
@@ -150,21 +152,19 @@ def get_params_for_weight_decay_optimization(module, config):
     weight_decay_params = {"params": []}
     no_weight_decay_params = {"params": [], "weight_decay": 0.0}
     blacklist_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
-
-    for module_ in module.modules():
+    names = []
+    for named, module_ in module.named_modules():
         if isinstance(module_, blacklist_modules) or (
             config.weight_decay == 0.0
         ):  # also include all parameters here if no weight decay is being done
-            no_weight_decay_params["params"].extend(
-                [
-                    p
-                    for p in list(module_._parameters.values())
-                    if (p is not None) and p.requires_grad
-                ]
-            )
+            if not ('lm_head' in named):
+                for n, p in list(module_._parameters.items()):
+                    if (p is not None) and p.requires_grad:
+                        no_weight_decay_params['params'].append(p)
+                        names.append(named + "." + n)
         else:
             for n, p in list(module_._parameters.items()):
-                if p is not None and p.requires_grad:
+                if (p is not None) and p.requires_grad:
                     if n != "bias":
                         weight_decay_params["params"].append(p)
                     else:
@@ -173,8 +173,9 @@ def get_params_for_weight_decay_optimization(module, config):
     param_dict = {
         pn: p
         for pn, p in module.named_parameters()
-        if p is not None and p.requires_grad
+        if (not p is None) and p.requires_grad
     }
+
     assert len(no_weight_decay_params["params"]) + len(
         weight_decay_params["params"]
     ) == len(
@@ -192,41 +193,56 @@ def configure_param_groups(model, config):
     If a separate learning rate for the image prefix is provided, we separate out the groups here.
     Additionally, parameters to which weight decay shouldn't be applied (layernorms / biases) are separated.
     """
-    if config.image_enc_lr is not None:
 
-        # get the params for the image prefix / proj
-        image_enc_params = get_params_for_weight_decay_optimization(
-            model.image_prefix.enc, config
+    # get the params for the image prefix / proj
+    image_enc_params = get_params_for_weight_decay_optimization(
+        model.image_prefix.enc, config
+    )
+    image_proj_params = get_params_for_weight_decay_optimization(
+        model.image_prefix.proj, config
+    )
+
+    # get the params for layernorm if it exists
+    if config.use_image_embed_layernorm:
+        image_ln_params = get_params_for_weight_decay_optimization(
+            model.image_prefix.ln, config
         )
+        image_proj_params += image_ln_params
+
+    # get the params for the lm
+    rationals_list = torch.nn.ParameterList([])
+    lm_list = torch.nn.ParameterList([])
+    for name, param in model.lm.named_parameters():
+        if any(map(name.__contains__, ['numerator', 'denominator', 'switch_logits'])):
+            rationals_list.append(param)
+        else:
+            lm_list.append(param)
+
+    lm_params = get_params_for_weight_decay_optimization(lm_list, config)
+    rationals_params = get_params_for_weight_decay_optimization(
+        rationals_list, config)
+
+    if config.image_enc_lr is not None:
         for pdict in image_enc_params:
             pdict["lr"] = config.image_enc_lr
-        image_proj_params = get_params_for_weight_decay_optimization(
-            model.image_prefix.proj, config
+
+    if config.rationals_lr is not None:
+        for pdict in rationals_params:
+            pdict["lr"] = config.rationals_lr
+
+    # get params for class head if it exists
+    class_params = []
+    if hasattr(model, "class_head") and model.class_head is not None:
+        class_params = get_params_for_weight_decay_optimization(
+            model.class_head, config
         )
 
-        # get the params for layernorm if it exists
-        if config.use_image_embed_layernorm:
-            image_ln_params = get_params_for_weight_decay_optimization(
-                model.image_prefix.ln, config
-            )
-            image_proj_params += image_ln_params
-
-        # get the params for the lm
-        lm_params = get_params_for_weight_decay_optimization(model.lm, config)
-
-        # get params for class head if it exists
-        class_params = []
-        if hasattr(model, "class_head") and model.class_head is not None:
-            class_params = get_params_for_weight_decay_optimization(
-                model.class_head, config
-            )
-
-        all_params = []
-        for p in image_enc_params + lm_params + image_proj_params + class_params:
-            if p["params"]:
-                all_params.append(p)
-    else:
-        all_params = get_params_for_weight_decay_optimization(model, config)
+    all_params = []
+    for p in image_enc_params + lm_params + image_proj_params + rationals_params + class_params:
+        if p["params"]:
+            all_params.append(p)
+    # else:
+    #     all_params = get_params_for_weight_decay_optimization(model, config)
 
     # merge param dicts with shared lr / wd values
     d = defaultdict(dict)
@@ -278,9 +294,9 @@ def log_table(name, model_outputs, gt_answers_list, global_step):
 
 
 def get_world_info():
-    local_rank = int(os.environ.get("LOCAL_RANK",0))
-    rank = int(os.environ.get("RANK",0))
-    world_size = int(os.environ.get("WORLD_SIZE",0))
+    local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    rank = int(os.environ.get("RANK", 0))
+    world_size = int(os.environ.get("WORLD_SIZE", 0))
     return local_rank, rank, world_size
 
 
@@ -338,7 +354,8 @@ def infer_checkpoint_path_from_config(config):
 def to_cuda_half(*args):
     cuda_half_args = []
     local_rank, rank, world_size = get_world_info()
-    device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available(
+    ) else 'cpu'
     for x in args:
         if isinstance(x, list):
             x_cuda_half = to_cuda_half(*x)
@@ -375,7 +392,8 @@ def build_labels(
     """
     shape = input_embeddings.shape[:2]  # b, s
     local_rank, rank, world_size = get_world_info()
-    device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available(
+    ) else 'cpu'
 
     assert captions.shape[1] >= shape[1]
     # make sure to add masked embedding tokens in the appropriate locations in the labels
@@ -442,3 +460,9 @@ def write_tensorboard(model, writer, step):
                 module.show_all(writer=writer, step=step,
                                 title='All Rational Modules')
                 all = True
+    for name, param in model.named_parameters():
+        if 'switch_logits' in name:
+            fig, ax = plt.subplots()
+            weights = param.to('cpu').detach().numpy()
+            ax.bar(['Adapter', 'Identity'], weights)
+            writer.add_figure(f'{name}', fig, step)

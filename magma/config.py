@@ -25,10 +25,11 @@ class MultimodalConfig:
 
     batch_size: int
     train_steps: int
-    train_micro_batch_size_per_gpu: int
+    # train_micro_batch_size_per_gpu: int
     optimizer_name: str = "AdamW"
     lr: float = 8.0e-4
     image_enc_lr: float = None
+    rationals_lr: float = None
     min_lr: float = 0.0
     lr_decay_iters: int = None
     gradient_accumulation_steps: int = 1
@@ -43,7 +44,7 @@ class MultimodalConfig:
     fine_tune: bool = False
     load_optimizer: bool = True
     rational_image_encoder: bool = False
-
+    fb20_dataloader: bool = False
     # Checkpointing:
     # ------------------------------------------------------------
     save_every: int = 500
@@ -135,12 +136,13 @@ class MultimodalConfig:
         self.deepspeed_config_params = {
             "train_batch_size": self.batch_size,
             "gradient_accumulation_steps": self.gradient_accumulation_steps,
+            # "train__micro_batch_size_per_gpu": self.train_micro_batch_size_per_gpu,
             "gradient_clipping": self.gradient_clipping,
-            "fp16": {"enabled": True, "loss_scale_window": 250},
+            "fp16": {"enabled": False, "loss_scale_window": 1000, 'min_loss_scale': 1e-6, 'initial_scale_power': 32},
             "scheduler": self.scheduler_dict,
             "zero_optimization": {
                 "stage": self.zero_stage,
-                "load_from_fp32_weights": False,
+                # "load_from_fp32_weights": True,
                 "offload_optimizer": {
                     "device": "cpu",
                 },
