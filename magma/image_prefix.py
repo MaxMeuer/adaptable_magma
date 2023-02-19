@@ -20,6 +20,7 @@ ENCODER_OUT_DIMS = {
     "nfresnet50": 2048,
     'clip_RN50': 2048,
     "clip": 512,
+    'clip_ViT-L/14': 768,
     "clip_resnet": 2560,
     "clip_resnet_large": 3072,
     "clip_resnet_tiny": 3072,

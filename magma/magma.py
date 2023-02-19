@@ -3,6 +3,7 @@ from os.path import exists
 import torch
 import torch.nn as nn
 from copy import deepcopy
+from einops import rearrange
 from typing import Literal, Optional, List
 from torchtyping import TensorType
 from transformers.file_utils import ModelOutput
@@ -10,8 +11,10 @@ from magma.config import MultimodalConfig
 from .perceiver_resampler import PerceiverResampler
 from .cross_attention import GatedCrossAttentionBlock
 from torch.nn.modules.container import ModuleList, Sequential
+from transformers import AutoModelForCausalLM
 from torch.nn.parameter import Parameter
 from activations.torch import Rational
+from collections import OrderedDict
 
 from magma.utils import get_tokenizer
 from .language_model import get_gptj
@@ -91,6 +94,7 @@ class Magma(nn.Module):
             self.cross_attention_layers = []
             self.lm.resize_token_embeddings(len(self.tokenizer))
             self.word_embedding = self.lm.transformer.wte
+
             self.perceiver_resampler = PerceiverResampler(
                 self.image_prefix.encoder_out_dim,
                 n_latents=config.cross_attention_config['n_latents'],
@@ -124,12 +128,16 @@ class Magma(nn.Module):
         if config.freeze_lm:
             for name, param in self.lm.named_parameters():  # freeze lm weights
                 if config.adapter_config and not config.adapter_config.get('freeze', False):
-                    if any(map(name.__contains__, ['adapter', 'switch_logits'])):
+                    if any(map(name.__contains__, ['adapter', 'switch_logits', "gated_x_attn"])):
                         param.requires_grad = True
                     else: 
                         param.requires_grad = False
                 else:
-                    param.requires_grad = False
+                    if any(map(name.__contains__, ["ln_1.1."])): 
+                        param.requires_grad = True
+                    else:
+                        param.requires_grad = False
+
                     
         if config.freeze_img_encoder:
             if config.rational_image_encoder:
@@ -156,15 +164,20 @@ class Magma(nn.Module):
 
     def add_cross_attention_modules(self):
         for l in range(len(self.lm.transformer.h)):
-            layer_norm = getattr(self.lm.transformer.h[l], "ln_1")
+            if l % self.config.cross_attention_config['cadence'] != 0:
+                continue
+            
+            pretrained_block = getattr(self.lm.transformer.h[l], "ln_1")
             x_attn_block = GatedCrossAttentionBlock(
                 config=self.config.cross_attention_config,
                 text_token_dim=self.lm.config.hidden_size,
                 visual_token_dim=self.image_prefix.encoder_out_dim
             )
             self.cross_attention_layers.append(l)
-            setattr(self.lm.transformer.h[l], 'ln_1', nn.Sequential(
-                *[x_attn_block, layer_norm]))
+
+            # setattr(self.lm.transformer.h, f'{l}', nn.Sequential(
+            #     OrderedDict([("self_attn",pretrained_block),("gated_x_attn" ,x_attn_block)])))
+            setattr(self.lm.transformer.h[l], "ln_1", nn.Sequential(*[pretrained_block,x_attn_block]))
 
     def add_adapters(
         self,
@@ -351,11 +364,13 @@ class Magma(nn.Module):
 
         if input_embeddings is None:
             input_embeddings = self.image_prefix(images)
-
-        if images.dim == 5:
-            images = images[:, :, None, :, :, :]  # Add Times Dimension
+            input_embeddings = rearrange(   
+                input_embeddings, '(b n) s d -> b n s d', n=self.config.few_shot)
 
         word_embeddings = self.word_embedding(captions)
+        labels = build_labels(
+            input_embeddings, captions, self.eos_token
+        )
 
         if self.config.cross_attention_config is not None:
 
@@ -367,21 +382,19 @@ class Magma(nn.Module):
             )
 
             for l in self.cross_attention_layers:
-                x_attn_block = getattr(
-                    self.transformer[l], 'ln_1')[0]
+                x_attn_block = getattr(self.transformer[l], 'ln_1')[1]
 
                 x_attn_block.perceiver_pipe(
                     visual_features, media_mask=media_mask)
 
             lm_outputs = self.lm(
                 inputs_embeds=word_embeddings,
+                labels=labels,
                 output_hidden_states=output_hidden_states,
             )
 
         else:
-            labels = build_labels(
-                input_embeddings, captions, self.eos_token
-            )  # build labels from input_embeddings
+
             # forward joined embeddings through lm
             input_embeddings = torch.cat(
                 (

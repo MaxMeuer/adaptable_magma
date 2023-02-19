@@ -53,10 +53,11 @@ class MaskedCrossAttention(nn.Module):
     ):
         super().__init__()
         local_rank, rank, world_size = get_world_info()
-        self.device = f'cuda:{local_rank}'
+        self.device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu'
         self.num_heads = num_heads
         self.temp = 1 / (head_dim ** -0.5)
         self.softmax = nn.Softmax(dim=-1)
+        
 
 
         self.v_k_w = nn.Linear(
@@ -107,7 +108,9 @@ class GatedCrossAttentionBlock(nn.Module):
 
     def forward(self, embs: TensorType["Batch", "Sequence Length", "TokenDim"]):
         x_attn = self.x_attn(self.visual_features, embs, self.media_mask)
-        attn_out = embs + tanh(self.tanh1) * x_attn
-        x_ffw = attn_out + self.ffw(x_attn) * tanh(self.tanh2)
+        attn_out = embs +  x_attn
+        # attn_out = embs + tanh(self.tanh1) * x_attn
+        x_ffw = attn_out + self.ffw(attn_out) 
+        # x_ffw = attn_out + self.ffw(attn_out) * (tanh(self.tanh2))
 
         return x_ffw

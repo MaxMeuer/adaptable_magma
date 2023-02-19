@@ -5,19 +5,25 @@
     perceiver: True,
 
     
-    # image encoder settings
-    encoder_name: 'clip_RN50',
+# image encoder settings
+    encoder_name: 'clip_resnet_large',
     freeze_img_encoder: True,
     rational_image_encoder: False,
+    few_shot: 3,
 
-    cross_attention_config:{"cadence": 2, "n_latents":64},
+    # LM Settings
+    lm_name: 'EleutherAI/gpt-neo-125M',
+    fp16_enabled: False,
+
+
+    cross_attention_config:{"cadence": 2, "n_latents":64, few_shots=3},
 
     # adapter settings
     # adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4}, "adapter_switch": True, "hidden_act": "rational:relu" },
 
     
     # train settings 
-    batch_size: 4,
+    batch_size: 8,
     train_steps: 500,
     lr: 8.0e-4,
     min_lr: 0.0,

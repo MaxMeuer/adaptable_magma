@@ -63,6 +63,8 @@ def clip_encoder(
     """
     if name in ["clip", "ViT-B/32"]:
         name = "ViT-B/32"
+    if name in ["clip_ViT-L/14"]:
+        name = "ViT-L/14"
     elif name in ["clip_resnet", "RN50x4"]:
         name = "RN50x4"
     elif name in ['clip_RN50']:
