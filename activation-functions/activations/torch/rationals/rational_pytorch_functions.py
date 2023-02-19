@@ -15,9 +15,9 @@ def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
     # P(X) / Q(X) = a_0 + a_1 * X + ... + a_n * X^n /
     #               1 + | b_1 * X | + | b_2 * X^2| + ... + | b_m * X ^m|
 
-    c_x = x.to(dtype=torch.float32)
-    weight_denominator = weight_denominator.to(dtype=torch.float32)
-    weight_numerator = weight_numerator.to(dtype=torch.float32)
+    c_x = x.to(dtype=torch.float64)
+    weight_denominator = weight_denominator.to(dtype=torch.float64)
+    weight_numerator = weight_numerator.to(dtype=torch.float64)
 
     len_num, len_deno = len(weight_numerator), len(weight_denominator)
     post = torch.zeros(len(weight_numerator) -
