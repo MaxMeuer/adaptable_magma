@@ -203,6 +203,8 @@ def configure_param_groups(model, config):
         model.image_prefix.proj, config
     )
 
+    perceiver_params = get_params_for_weight_decay_optimization(
+        model.perceiver_resampler, config)
     # get the params for layernorm if it exists
     if config.use_image_embed_layernorm:
         image_ln_params = get_params_for_weight_decay_optimization(
@@ -248,7 +250,7 @@ def configure_param_groups(model, config):
         )
 
     all_params = []
-    for p in image_enc_params + lm_params + image_proj_params + rationals_params + switch_params + class_params:
+    for p in image_enc_params + lm_params + image_proj_params + perceiver_params + rationals_params + switch_params + class_params:
         if p["params"]:
             all_params.append(p)
     # else:

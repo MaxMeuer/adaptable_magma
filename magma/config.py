@@ -77,6 +77,7 @@ class MultimodalConfig:
     seq_len: int = None
     perceiver: bool = False
     dtype: str = "float32"
+    few_shot: int = 1
 
     # Layer Freezing settings:
     # ------------------------------------------------------------

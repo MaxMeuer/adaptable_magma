@@ -3,6 +3,7 @@ from os.path import exists
 import torch
 import torch.nn as nn
 from copy import deepcopy
+from einops import rearrange
 from typing import Literal, Optional, List
 from torchtyping import TensorType
 from transformers.file_utils import ModelOutput
@@ -136,7 +137,7 @@ class Magma(nn.Module):
             else:
                 for param in self.image_prefix.enc.parameters():
                     param.requires_grad = False
-                    
+
         for name, param in self.named_parameters():
             if param.is_contiguous() is False:
                 path, param = name.rsplit(".", 1)
@@ -348,11 +349,17 @@ class Magma(nn.Module):
 
         if input_embeddings is None:
             input_embeddings = self.image_prefix(images)
-
-        if images.dim == 5:
-            images = images[:, :, None, :, :, :]  # Add Times Dimension
+            input_embeddings = rearrange(
+                input_embeddings, '(b n) s d -> b n s d', n=self.config.few_shot)
+        print(input_embeddings.shape)
+        print(captions.shape)
+        # if images.dim == 5:
+        #     images = images[:, :, None, :, :, :]  # Add Times Dimension
 
         word_embeddings = self.word_embedding(captions)
+        labels = build_labels(
+            input_embeddings, captions, self.eos_token
+        )
 
         if self.config.cross_attention_config is not None:
 
@@ -372,13 +379,12 @@ class Magma(nn.Module):
 
             lm_outputs = self.lm(
                 inputs_embeds=word_embeddings,
+                labels=labels,
                 output_hidden_states=output_hidden_states,
             )
 
         else:
-            labels = build_labels(
-                input_embeddings, captions, self.eos_token
-            )  # build labels from input_embeddings
+
             # forward joined embeddings through lm
             input_embeddings = torch.cat(
                 (

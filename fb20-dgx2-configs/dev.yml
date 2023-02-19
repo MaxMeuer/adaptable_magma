@@ -9,14 +9,15 @@
     encoder_name: 'clip_resnet_large',
     freeze_img_encoder: True,
     rational_image_encoder: False,
+    few_shot: 3,
 
     # LM Settings
     lm_name: 'EleutherAI/gpt-neo-125M',
     fp16_enabled: False,
 
     # adapter settings
-    adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4}, "switch_temp": 0.1, "adapter_switch": True, "hidden_act": "rational:relu" },
-
+    # adapter_config: {"mlp": {"adapter_type": "normal", "downsample_factor": 4}, "switch_temp": 0.1, "adapter_switch": True, "hidden_act": "rational:relu" },
+    cross_attention_config:{"cadence": 2, "n_latents":64},
     # train settings 
     batch_size: 1,
     train_steps: 500,

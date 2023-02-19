@@ -70,6 +70,7 @@ class MaskedCrossAttention(nn.Module):
                 y: TensorType["Batch", "Sequence Length", "TokenDim"],
                 media_mask: TensorType["Batch", "Sequence Length"]
                 ):
+        print('Latent Shape',latent.shape)
         visual_features = rearrange(latent, 'b t n d -> b (t n) d')
 
         k, v = self.v_k_w(visual_features).chunk(2, dim=-1)

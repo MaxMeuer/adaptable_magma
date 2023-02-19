@@ -70,12 +70,12 @@ class PerceiverResampler(nn.Module):
             ]))
         self.normalize = nn.LayerNorm(token_dim)
 
-    def forward(self, x: TensorType["Batch", "Number of Images", "Time", "Sequence", "Token Dimesion"]):
+    def forward(self, x: TensorType["Batch",  "Time", "Number of Images", "Sequence", "Token Dimesion"]):
         if x.ndim == 3:
             x = x[:, None, None, :, :]
 
-        batch_size, number_of_images, time, sequence_length, token_dim = x.size()
-        x = rearrange(x, "b n t s d -> b n (t s) d")
+        batch_size, number_of_images, sequence_length, token_dim = x.size()
+        # x = rearrange(x, "b n s d -> b n s d")
         latents = self.learned_latents.repeat(
             batch_size, number_of_images, 1, 1)
         x = x + self.time_embeddings[:number_of_images]
