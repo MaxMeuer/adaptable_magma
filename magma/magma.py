@@ -9,6 +9,8 @@ from transformers.file_utils import ModelOutput
 from magma.config import MultimodalConfig
 from .perceiver_resampler import PerceiverResampler
 from .cross_attention import GatedCrossAttentionBlock
+from torch.nn.modules.container import ModuleList, Sequential
+from torch.nn.parameter import Parameter
 from activations.torch import Rational
 
 from magma.utils import get_tokenizer
@@ -70,6 +72,20 @@ class Magma(nn.Module):
             input_resolution=self.image_prefix.enc.input_resolution,
         )
 
+        for name, param in self.named_parameters():
+            if param.is_contiguous() is False:
+                path, param = name.rsplit(".", 1)
+                path = path.split('.')
+                ref = self
+                while path:
+                    element, path = path[0], path[1:]
+                    if type(ref) in {Sequential, ModuleList}:
+                        ref = ref[int(element)]
+                    else:
+                        ref = getattr(ref, element)
+                setattr(ref, param, Parameter(
+                    getattr(ref, param).contiguous()))
+
         # add cross attention
         if config.cross_attention_config:
             self.cross_attention_layers = []
@@ -120,6 +136,20 @@ class Magma(nn.Module):
             else:
                 for param in self.image_prefix.enc.parameters():
                     param.requires_grad = False
+                    
+        for name, param in self.named_parameters():
+            if param.is_contiguous() is False:
+                path, param = name.rsplit(".", 1)
+                path = path.split('.')
+                ref = self
+                while path:
+                    element, path = path[0], path[1:]
+                    if type(ref) in {Sequential, ModuleList}:
+                        ref = ref[int(element)]
+                    else:
+                        ref = getattr(ref, element)
+                setattr(ref, param, Parameter(
+                    getattr(ref, param).contiguous()))
 
     def add_cross_attention_modules(self):
         for l in range(len(self.lm.transformer.h)):
