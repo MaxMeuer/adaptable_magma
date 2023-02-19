@@ -45,7 +45,8 @@ class ImagePrefix(nn.Module):
         super().__init__()
         local_rank, rank, world_size = get_world_info()
 
-        self.device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available(
+        ) else 'cpu'
         self.config = config
         self.encoder_type = config.encoder_name
 
@@ -75,8 +76,10 @@ class ImagePrefix(nn.Module):
             if self.encoder_type not in ENCODER_SEQ_LENS
             else self.out_dim
         )
-        self.proj = nn.Linear(self.encoder_out_dim, proj_out_dim)
-        self.dropout = nn.Dropout(config.image_embed_dropout_prob)
+        self.proj = nn.Linear(self.encoder_out_dim,
+                              proj_out_dim)
+        self.dropout = nn.Dropout(
+            config.image_embed_dropout_prob)
         self.use_layernorm = config.use_image_embed_layernorm
         if self.use_layernorm:
             self.ln = nn.LayerNorm(self.out_dim)
@@ -96,7 +99,8 @@ class ImagePrefix(nn.Module):
             assert self.encoder_type in ENCODER_SEQ_LENS
         else:
             assert logits.ndim == 2
-
+        print(logits.dtype)
+        logits = logits.to(torch.float32)
         logits = self.proj(logits)
 
         # reshape to desired output shape

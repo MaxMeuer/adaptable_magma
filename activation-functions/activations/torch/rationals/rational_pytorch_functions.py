@@ -14,27 +14,24 @@ def _get_xps(z, len_numerator, len_denominator):
 def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
     # P(X) / Q(X) = a_0 + a_1 * X + ... + a_n * X^n /
     #               1 + | b_1 * X | + | b_2 * X^2| + ... + | b_m * X ^m|
-    old_dtype = x.dtype
-    x = x.to(dtype=torch.float32)
 
+    c_x = x.to(dtype=torch.float32)
     weight_denominator = weight_denominator.to(dtype=torch.float32)
     weight_numerator = weight_numerator.to(dtype=torch.float32)
 
     len_num, len_deno = len(weight_numerator), len(weight_denominator)
     post = torch.zeros(len(weight_numerator) -
-                       len(weight_denominator) - 1).to(device=x.device, dtype=x.dtype)
+                       len(weight_denominator) - 1).to(device=x.device, dtype=c_x.dtype)
+    z = c_x.view(-1)
 
-    z = x.view(-1)
     singles = z.view(z.shape[-1], 1)
     pre_vander = singles.repeat(
         1, max(len_num, len_deno)).to(dtype=x.dtype)
 
     pows = torch.arange(0, max(len_num, len_deno),
                         device=x.device, dtype=x.dtype)
-    vander = torch.pow(pre_vander, pows)
 
-    # print('vander', vander.isnan().any() or vander.isinf().any())
-    # vander = vander.to(x.dtype)
+    vander = torch.pow(pre_vander, pows)
 
     numerator = torch.mul(vander, weight_numerator).sum(-1)
 
@@ -46,9 +43,6 @@ def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
     flat_out = torch.div(numerator, denominator)
 
     out = flat_out.view(x.shape).to(dtype=x.dtype)
-    # out  = torch.nan_to_num(out, nan=0, posinf=torch.finfo(
-    #     x.dtype).max, neginf=torch.finfo(x.dtype).min)
-    out = out.to(dtype=old_dtype)
     return out
 
 

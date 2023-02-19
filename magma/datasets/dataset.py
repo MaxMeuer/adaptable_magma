@@ -25,7 +25,6 @@ import io
 from tokenizers import Tokenizer
 
 
-
 dtypes = {
     1: np.uint8,
     2: np.int8,
@@ -37,6 +36,7 @@ dtypes = {
     8: np.uint16,
 }
 
+
 def np_byte_array_to_image(np_byte_array: np.ndarray):
     """
     converts a numpy bytes array to a pillow image
@@ -45,10 +45,12 @@ def np_byte_array_to_image(np_byte_array: np.ndarray):
     img = Image.open(img_byte_arr)
     return img
 
+
 def _warmup_mmap_file(path):
     with open(path, "rb") as stream:
         while stream.read(100 * 1024 * 1024):
             pass
+
 
 def code(dtype):
     for k in dtypes.keys():
@@ -119,6 +121,7 @@ def _load_paths(data_dir, sort=True):
     ):
         paths.append(p)
     return sorted(paths)
+
 
 class MMapIndexedDataset(torch.utils.data.Dataset):
     class Index(object):
@@ -287,7 +290,8 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
         elif isinstance(idx, slice):
             start, stop, step = idx.indices(len(self))
             if step != 1:
-                raise ValueError("Slices into indexed_dataset must be contiguous")
+                raise ValueError(
+                    "Slices into indexed_dataset must be contiguous")
             ptr = self._index._pointers[start]
             sizes = self._index._sizes[idx]
             offsets = list(accumulate(sizes))
@@ -337,6 +341,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
             data_file_path(path)
         )
 
+
 class LazyLoader:
     def __init__(self, data_dir, few_shot):
         self.few_shot = few_shot
@@ -371,9 +376,11 @@ class ImgCptDataset(Dataset):
         self.load_data_in_memory = load_data_in_memory
         self.few_shot = few_shot
 
-        self.orig_tokenizer = Tokenizer.from_file('/root/bjoern/adaptadapt/transformer/tests/files/alpha-001-128k.json')
+        self.orig_tokenizer = Tokenizer.from_file(
+            '/home/ml-mmeuer/adaptable_magma/magma/datasets/coco_converted/alpha-001-128k.json')
         self.image_data = MMapIndexedDataset(str(self.data_dir)+'_images')
-        self.text_data = MMapIndexedDataset(str(self.data_dir)+'_tokenizer_alpha-001-128k_eng')
+        self.text_data = MMapIndexedDataset(
+            str(self.data_dir)+'_tokenizer_alpha-001-128k_eng')
 
     def __len__(self):
         return len(self.text_data)//self.few_shot
@@ -381,7 +388,8 @@ class ImgCptDataset(Dataset):
     def __getitem__(
         self, idx
     ) -> Tuple[TensorType["b", "c", "h", "w"], TensorType["b", "s"]]:
-        cur_data = self.text_data[self.few_shot *idx: (self.few_shot * idx) + self.few_shot]
+        cur_data = self.text_data[self.few_shot *
+                                  idx: (self.few_shot * idx) + self.few_shot]
 
         try:
 
@@ -390,7 +398,8 @@ class ImgCptDataset(Dataset):
             text = ""
             for i, t in enumerate(cur_data):
                 try:
-                    cur_img = np_byte_array_to_image(self.image_data[int(t[0])])
+                    cur_img = np_byte_array_to_image(
+                        self.image_data[int(t[0])])
                 except:
                     continue
                 # tokenized t[0] is index of image, t[1:] is actual caption

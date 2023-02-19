@@ -6,7 +6,7 @@ from torch.optim import AdamW
 from pathlib import Path
 from magma.config import MultimodalConfig
 from torch.utils.data import random_split, ConcatDataset
-#from tensorboardX import SummaryWriter
+from tensorboardX import SummaryWriter
 
 import wandb
 import deepspeed
@@ -186,14 +186,15 @@ if __name__ == "__main__":
                 else config.lr
             )
             to_log = {"train/loss": loss, "train/lr": current_lr}
+            # writer.add_scalar("train/loss", loss, global_step)
+            # write_tensorboard(model, writer, step=global_step)
             wandb_log(to_log, step=global_step)
 
         # Evaluation phase
-        if False and (global_step % config.eval_every == 0):
+        if (global_step % config.eval_every == 0):
             model_engine.eval()
             with torch.no_grad():
 
-                write_tensorboard(model, writer, step=global_step)
                 # eval step:
                 eval_loss = eval_step(
                     config, eval_loader, model_engine, device=torch.device("cuda", args.local_rank))

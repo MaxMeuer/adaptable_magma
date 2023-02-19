@@ -13,7 +13,7 @@ class Activation_Function_Class(nn.Module):
     Implementation of various activation function.
     """
 
-    def __init__(self, hidden_act):
+    def __init__(self, hidden_act, use_cuda_kernels=False):
         super().__init__()
         local_rank, rank, world_size = get_world_info()
 
@@ -53,8 +53,7 @@ class Activation_Function_Class(nn.Module):
             func_name = hidden_act.lower().split(':', 1)[1]
             self.f = Rational(
                 cuda=f'cuda:{local_rank}', trainable=True, train_numerator=True,
-                train_denominator=True, version="A", approx_func=func_name
-            )
+                train_denominator=True, version="A", approx_func=func_name, use_cuda_kernels=use_cuda_kernels)
 
     def forward(self, x):
         # print("ADAPTER FORWARD")
@@ -90,9 +89,9 @@ class Adapter(nn.Module):
         add_layernorm: bool = False,
         adapter_switch: bool = False,
         initial_logits=[0.5, 0.5],  # : list[float] = [0.5, 0.5],
-        initial_temperature: float = 1.0,
+        switch_temp: float = 1.0,
         fixed_idx: int = None,
-
+        use_cuda_kernels: bool = False,
     ):
 
         super().__init__()
@@ -103,7 +102,8 @@ class Adapter(nn.Module):
             [
                 nn.Linear(dim, dim // downsample_factor),
                 # nn.ReLU(),
-                Activation_Function_Class(hidden_act),
+                Activation_Function_Class(
+                    hidden_act, use_cuda_kernels=use_cuda_kernels),
                 nn.Linear(dim // downsample_factor, dim),
             ]
         )
@@ -116,7 +116,7 @@ class Adapter(nn.Module):
         if adapter_switch:
             self.switch_logits = nn.Parameter(torch.tensor(initial_logits))
 
-            self.switch_temp = torch.tensor(initial_temperature)
+            self.switch_temp = torch.tensor(switch_temp)
 
             self.register_parameter("switch_logits", self.switch_logits)
 
@@ -179,10 +179,19 @@ class ParallelAdapter(Adapter):
         downsample_factor: int = 4,
         scaled: bool = False,
         add_layernorm: bool = False,
-        activation: nn.Module = nn.ReLU,
+        hidden_act: str = 'relu',
+        use_cuda_kernels: bool = False,
+        switch_temp: float = 1.0,
+        adapter_switch: bool = True
     ):
         super().__init__(
-            dim, downsample_factor, add_layernorm=add_layernorm, activation=activation
+            dim,
+            downsample_factor,
+            add_layernorm=add_layernorm,
+            hidden_act=hidden_act,
+            use_cuda_kernels=use_cuda_kernels,
+            switch_temp=switch_temp,
+            adapter_switch=adapter_switch
         )
         self.module = module
 
@@ -208,8 +217,10 @@ class ParallelAdapterWrapper(ParallelAdapter):
         downsample_factor: int = 4,
         scaled: bool = False,
         add_layernorm: bool = False,
-        hidden_activation: nn.Module = nn.ReLU,
-        adapter_switch: bool = False,
+        hidden_act: str = 'relu',
+        use_cuda_kernels: bool = False,
+        switch_temp: float = 1.0,
+        adapter_switch: bool = True
     ):
         super().__init__(
             module,
@@ -217,8 +228,10 @@ class ParallelAdapterWrapper(ParallelAdapter):
             downsample_factor=downsample_factor,
             scaled=scaled,
             add_layernorm=add_layernorm,
-            hidden_activation=hidden_activation,
-            adapter_switch=adapter_switch,
+            hidden_act=hidden_act,
+            use_cuda_kernels=use_cuda_kernels,
+            switch_temp=switch_temp,
+            adapter_switch=adapter_switch
         )
 
     def forward(self, x: TensorType["b", "s", "d"], *attn_args, **attn_kwargs):
@@ -239,8 +252,10 @@ class AdapterWrapper(Adapter):
         attn_block: nn.Module,
         dim: int,
         downsample_factor: int = 4,
-        hidden_activation: nn.Module = nn.ReLU,
-        adapter_switch: bool = False,
+        hidden_act: str = 'relu',
+        use_cuda_kernels: bool = False,
+        switch_temp: float = 1.0,
+        adapter_switch: bool = True,
         add_layernorm: bool = False,
 
     ):
@@ -248,7 +263,9 @@ class AdapterWrapper(Adapter):
             dim=dim,
             downsample_factor=downsample_factor,
             add_layernorm=add_layernorm,
-            hidden_activation=hidden_activation,
+            hidden_act=hidden_act,
+            use_cuda_kernels=use_cuda_kernels,
+            switch_temp=switch_temp,
             adapter_switch=adapter_switch
         )
 

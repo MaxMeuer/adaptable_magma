@@ -9,26 +9,29 @@ LANGUAGE_MODELS = [
 ]
 
 
-
 def get_gptj(config: MultimodalConfig,
-    gradient_checkpointing: bool = True,
-    from_pretrained="EleutherAI/gpt-j-6B",
-) -> torch.nn.Module:
+             gradient_checkpointing: bool = True,
+             from_pretrained="EleutherAI/gpt-j-6B",
+             ) -> torch.nn.Module:
     """
     Loads GPTJ language model from HF
     """
     print_main("Loading GPTJ language model...")
     print_main("From", from_pretrained)
-    gptj_config = GPTJConfig.from_pretrained(from_pretrained)
+    gptj_config = AutoConfig.from_pretrained(from_pretrained)
     gptj_config.gradient_checkpointing = gradient_checkpointing
     if gradient_checkpointing:
         gptj_config.use_cache = False
 
     if config.deepspeed_config_params['fp16']['enabled'] is True:
+        assert isinstance(
+            gptj_config, GPTJConfig), "GPT Version must be GPT-J if fp16 is enabled"
         model = GPTJForCausalLM.from_pretrained(
-            from_pretrained, revision="float16", torch_dtype=torch.float16, low_cpu_mem_usage=True, config=gptj_config
+            from_pretrained, torch_dtype=torch.float16, revision='float16', low_cpu_mem_usage=True, config=gptj_config
         )
+
     else:
-        model = AutoModelForCausalLM.from_pretrained(from_pretrained, config=gptj_config)
+        model = AutoModelForCausalLM.from_pretrained(
+            from_pretrained, config=gptj_config)
 
     return model

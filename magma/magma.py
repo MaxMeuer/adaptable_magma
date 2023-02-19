@@ -7,8 +7,6 @@ from typing import Literal, Optional, List
 from torchtyping import TensorType
 from transformers.file_utils import ModelOutput
 from magma.config import MultimodalConfig
-from torch.nn.modules.container import ModuleList, Sequential
-from torch.nn.parameter import Parameter
 from .perceiver_resampler import PerceiverResampler
 from .cross_attention import GatedCrossAttentionBlock
 from activations.torch import Rational
@@ -42,13 +40,11 @@ class Magma(nn.Module):
         self.config = config
 
         # .to(self.device)
-        # self.lm = get_gptj(
-        #     config)
-        self.lm = get_gptj(config, from_pretrained="EleutherAI/gpt-neo-125M")
+        self.lm = get_gptj(config, from_pretrained=config.lm_name)
         self.seq_len = self.lm.config.max_position_embeddings
 
         self.tokenizer = get_tokenizer(
-            name="EleutherAI/gpt-neo-125M", sequence_length=self.seq_len)
+            config.tokenizer_name, sequence_length=self.seq_len)
 
         self.image_token = self.tokenizer.cls_token_id
         self.eos_token = self.tokenizer.eos_token_id
@@ -77,9 +73,8 @@ class Magma(nn.Module):
         # add cross attention
         if config.cross_attention_config:
             self.cross_attention_layers = []
-            self.tokenizer.add_special_tokens(
-                {"additional_special_tokens": ["<|image|>"]})
-            self.lm.config.img_token_id = self.tokenizer.encode("<|image|>")[0]
+            self.lm.resize_token_embeddings(len(self.tokenizer))
+            self.word_embedding = self.lm.transformer.wte
             self.perceiver_resampler = PerceiverResampler(
                 self.image_prefix.encoder_out_dim,
                 n_latents=config.cross_attention_config['n_latents'],
@@ -108,20 +103,6 @@ class Magma(nn.Module):
                     adapter_type=attn_config.pop("adapter_type"),
                     **attn_config,
                 )
-
-        for name, param in self.named_parameters():
-            if param.is_contiguous() is False:
-                path, param = name.rsplit(".", 1)
-                path = path.split('.')
-                ref = self
-                while path:
-                    element, path = path[0], path[1:]
-                    if type(ref) in {Sequential, ModuleList}:
-                        ref = ref[int(element)]
-                    else:
-                        ref = getattr(ref, element)
-                setattr(ref, param, Parameter(
-                    getattr(ref, param).contiguous()))
 
         # freeze parameters
         if config.freeze_lm:
@@ -175,8 +156,7 @@ class Magma(nn.Module):
             "mlp",
             "attention",
         ], "location must be one of 'mlp' or 'attention'"
-        print(self.config.adapter_config.get(
-            'initial_temperature', None))
+
         for l in range(len(self.transformer)):
             if location == "mlp":
                 if self.mlp_adapter_added:
@@ -192,6 +172,9 @@ class Magma(nn.Module):
                             'hidden_act', False),
                         adapter_switch=self.config.adapter_config.get(
                             'adapter_switch', False),
+                        switch_temp=self.config.adapter_config.get(
+                            'switch_temp', None),
+                        use_cuda_kernels=self.config.use_cuda_kernels,
                         **adapter_kwargs,
                     )
                 else:
@@ -202,8 +185,9 @@ class Magma(nn.Module):
                             'hidden_act', False),
                         adapter_switch=self.config.adapter_config.get(
                             'adapter_switch', False),
-                        initial_temperature=self.config.adapter_config.get(
-                            'initial_temperature', None),
+                        switch_temp=self.config.adapter_config.get(
+                            'switch_temp', None),
+                        use_cuda_kernels=self.config.use_cuda_kernels,
                         ** adapter_kwargs,
                     )
                     adapter_layer = nn.Sequential(
@@ -223,6 +207,13 @@ class Magma(nn.Module):
                         dim=self.lm.config.hidden_size,
                         downsample_factor=downsample_factor,
                         scaled="scaled" in adapter_type,
+                        hidden_act=self.config.adapter_config.get(
+                            'hidden_act', False),
+                        adapter_switch=self.config.adapter_config.get(
+                            'adapter_switch', False),
+                        switch_temp=self.config.adapter_config.get(
+                            'switch_temp', None),
+                        use_cuda_kernels=self.config.use_cuda_kernels,
                         **adapter_kwargs,
                     )
                 else:
@@ -233,8 +224,11 @@ class Magma(nn.Module):
                         hidden_act=self.config.adapter_config.get(
                             'hidden_act', False),
                         adapter_switch=self.config.adapter_config.get(
-                            'adapter_switch', False)
-                        ** adapter_kwargs,
+                            'adapter_switch', False),
+                        switch_temp=self.config.adapter_config.get(
+                            'switch_temp', None),
+                        use_cuda_kernels=self.config.use_cuda_kernels,
+                        **adapter_kwargs,
                     )
                 setattr(self.transformer[l], attn_attr, adapter_layer)
 
@@ -331,7 +325,8 @@ class Magma(nn.Module):
         word_embeddings = self.word_embedding(captions)
 
         if self.config.cross_attention_config is not None:
-            media_pos = captions == self.lm.config.img_token_id
+
+            media_pos = captions == self.tokenizer.cls_token_id
             media_mask = media_pos.cumsum(dim=-1)
             # add cross attention
             visual_features = self.perceiver_resampler(

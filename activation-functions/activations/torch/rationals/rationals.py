@@ -21,14 +21,14 @@ from ..functions import ActivationModule
 
 
 if torch_cuda_available():
-    # trzy:
-    from .rational_cuda_functions import Rational_CUDA_A_F, \
-        Rational_CUDA_B_F, Rational_CUDA_C_F, Rational_CUDA_D_F
-# except ImportError:
-#     print("Could not import rational_cuda_functions in activations module")
-#     import ipdb
-#     ipdb.set_trace()
-#     exit(1)
+    try:
+        from .rational_cuda_functions import Rational_CUDA_A_F, \
+            Rational_CUDA_B_F, Rational_CUDA_C_F, Rational_CUDA_D_F
+    except ImportError:
+        print("Could not import rational_cuda_functions in activations module")
+        import ipdb
+        ipdb.set_trace()
+        exit(1)
 
 
 def _save_input(self, input, output):
@@ -69,7 +69,7 @@ class Rational(ActivationModule, Rational_base):
 
     def __init__(self, approx_func="leaky_relu", degrees=(5, 4), cuda=None,
                  version="A", trainable=True, train_numerator=True,
-                 train_denominator=True, name=None, dtype=torch.float32):
+                 train_denominator=True, name=None, use_cuda_kernels=False):
         if name is None:
             name = f"Rational ({approx_func} init approx)"
         ActivationModule.__init__(self, name)
@@ -87,10 +87,10 @@ class Rational(ActivationModule, Rational_base):
         w_numerator, w_denominator = get_parameters(version, degrees,
                                                     approx_func)
 
-        self.numerator = nn.Parameter(torch.tensor(w_numerator, dtype=torch.float32),
+        self.numerator = nn.Parameter(torch.tensor(w_numerator),
                                       requires_grad=trainable and train_numerator)
 
-        self.denominator = nn.Parameter(torch.tensor(w_denominator, dtype=torch.float32),
+        self.denominator = nn.Parameter(torch.tensor(w_denominator),
                                         requires_grad=trainable and train_denominator)
 
         self.register_parameter("numerator", self.numerator)
@@ -103,49 +103,50 @@ class Rational(ActivationModule, Rational_base):
         self.init_approximation = approx_func
         self._saving_input = False
 
-        # if "cuda" in str(device):
-        #     if version == "A":
-        #         rational_func = Rational_CUDA_A_F
-        #     elif version == "B":
-        #         rational_func = Rational_CUDA_B_F
-        #     elif version == "C":
-        #         rational_func = Rational_CUDA_C_F
-        #     elif version == "D":
-        #         rational_func = Rational_CUDA_D_F
-        #     elif version == "N":
-        #         self.activation_function = Rational_NONSAFE_F
-        #         return
-        #     elif version == "S":
-        #         self.activation_function = Rational_Spline_F
-        #         return
-        #     else:
-        #         raise NotImplementedError(f"version {version} not implemented")
-        #     if 'apply' in dir(rational_func):
-        #         self.activation_function = rational_func.apply
-        #     else:
-        #         self.activation_function = rational_func
-        # else:
-        if version == "A":
-            rational_func = Rational_PYTORCH_A_F
-        elif version == "B":
-            rational_func = Rational_PYTORCH_B_F
-        elif version == "C":
-            rational_func = Rational_PYTORCH_C_F
-        elif version == "D":
-            rational_func = Rational_PYTORCH_D_F
-        elif version == "N":
-            rational_func = Rational_NONSAFE_F
-        elif version == "S":
-            self.activation_function = Rational_Spline_F
-            return
+        if "cuda" in str(device) and use_cuda_kernels:
+            if version == "A":
+                print("Using CUDA version A")
+                rational_func = Rational_CUDA_A_F
+            elif version == "B":
+                rational_func = Rational_CUDA_B_F
+            elif version == "C":
+                rational_func = Rational_CUDA_C_F
+            elif version == "D":
+                rational_func = Rational_CUDA_D_F
+            elif version == "N":
+                self.activation_function = Rational_NONSAFE_F
+                return
+            elif version == "S":
+                self.activation_function = Rational_Spline_F
+                return
+            else:
+                raise NotImplementedError(f"version {version} not implemented")
+            if 'apply' in dir(rational_func):
+                self.activation_function = rational_func.apply
+            else:
+                self.activation_function = rational_func
         else:
-            raise NotImplementedError(f"version {version} not implemented")
+            if version == "A":
+                print("Using CPU version A")
+                rational_func = Rational_PYTORCH_A_F
+            elif version == "B":
+                rational_func = Rational_PYTORCH_B_F
+            elif version == "C":
+                rational_func = Rational_PYTORCH_C_F
+            elif version == "D":
+                rational_func = Rational_PYTORCH_D_F
+            elif version == "N":
+                rational_func = Rational_NONSAFE_F
+            elif version == "S":
+                self.activation_function = Rational_Spline_F
+                return
+            else:
+                raise NotImplementedError(f"version {version} not implemented")
 
-        self.activation_function = rational_func
+            self.activation_function = rational_func
 
     def forward(self, x):
 
-        # return self.activation_function(x, self.numerator, self.denominator, self.training)
         y = self.activation_function(
             x, self.numerator, self.denominator)
         return y
