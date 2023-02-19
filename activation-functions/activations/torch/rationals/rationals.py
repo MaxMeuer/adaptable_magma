@@ -105,7 +105,6 @@ class Rational(ActivationModule, Rational_base):
 
         if "cuda" in str(device) and use_cuda_kernels:
             if version == "A":
-                print("Using CUDA version A")
                 rational_func = Rational_CUDA_A_F
             elif version == "B":
                 rational_func = Rational_CUDA_B_F
@@ -127,7 +126,6 @@ class Rational(ActivationModule, Rational_base):
                 self.activation_function = rational_func
         else:
             if version == "A":
-                print("Using CPU version A")
                 rational_func = Rational_PYTORCH_A_F
             elif version == "B":
                 rational_func = Rational_PYTORCH_B_F

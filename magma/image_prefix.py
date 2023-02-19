@@ -76,6 +76,12 @@ class ImagePrefix(nn.Module):
             if self.encoder_type not in ENCODER_SEQ_LENS
             else self.out_dim
         )
+
+        if config.fp16_enabled:
+            self.dtype = torch.float16
+        else:
+            self.dtype = torch.float32
+
         self.proj = nn.Linear(self.encoder_out_dim,
                               proj_out_dim)
         self.dropout = nn.Dropout(
@@ -100,6 +106,9 @@ class ImagePrefix(nn.Module):
         else:
             assert logits.ndim == 2
 
+        if self.dtype == torch.float32:
+            logits = logits.float()
+
         logits = self.proj(logits)
 
         # reshape to desired output shape
@@ -109,6 +118,7 @@ class ImagePrefix(nn.Module):
             logits = rearrange(
                 logits, "b (s d) -> b s d", d=self.out_dim, s=self.out_seq_len
             )
+        logits = logits.to(dtype=self.dtype)
 
         # pass through dropout and layer norm
         logits = self.dropout(logits)
