@@ -377,7 +377,7 @@ class ImgCptDataset(Dataset):
         self.few_shot = few_shot
 
         self.orig_tokenizer = Tokenizer.from_file(
-            '/home/ml-mmeuer/adaptable_magma/magma/datasets/coco_converted/alpha-001-128k.json')
+            '/root/bjoern/adaptadapt/transformer/tests/files/alpha-001-128k.json')
         self.image_data = MMapIndexedDataset(str(self.data_dir)+'_images')
         self.text_data = MMapIndexedDataset(
             str(self.data_dir)+'_tokenizer_alpha-001-128k_eng')

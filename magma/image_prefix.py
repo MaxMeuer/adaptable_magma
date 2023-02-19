@@ -99,8 +99,7 @@ class ImagePrefix(nn.Module):
             assert self.encoder_type in ENCODER_SEQ_LENS
         else:
             assert logits.ndim == 2
-        print(logits.dtype)
-        logits = logits.to(torch.float32)
+
         logits = self.proj(logits)
 
         # reshape to desired output shape
