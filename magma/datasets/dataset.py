@@ -377,7 +377,7 @@ class ImgCptDataset(Dataset):
         self.few_shot = few_shot
 
         self.orig_tokenizer = Tokenizer.from_file(
-            '/root/bjoern/adaptadapt/transformer/tests/files/alpha-001-128k.json')
+            '/home/ml-mmeuer/adaptable_magma/magma/datasets/coco_converted/alpha-001-128k.json')
         self.image_data = MMapIndexedDataset(str(self.data_dir)+'_images')
         self.text_data = MMapIndexedDataset(
             str(self.data_dir)+'_tokenizer_alpha-001-128k_eng')
@@ -394,7 +394,7 @@ class ImgCptDataset(Dataset):
         try:
 
             images = []
-            textes = []
+            textes = ''
             text = ""
             for i, t in enumerate(cur_data):
                 try:
@@ -404,19 +404,19 @@ class ImgCptDataset(Dataset):
                     continue
                 # tokenized t[0] is index of image, t[1:] is actual caption
 
-                text = f'<|image|> {self.orig_tokenizer.decode(t[1:])} '
-
+                text += f'<|image|> {self.orig_tokenizer.decode(t[1:])} '
                 images.append(self.transforms(cur_img))
-                textes.append(self.tokenizer.encode(
-                    text,
-                    return_tensors="pt",
-                    max_length=self.seq_len,
-                    padding="max_length",
-                    truncation=True,
-                ))
+
+            text = self.tokenizer.encode(
+                text,
+                return_tensors="pt",
+                max_length=self.seq_len,
+                padding="max_length",
+                truncation=True,
+            )
 
             img_tensor = torch.cat(images)
-            caption_tensor = torch.cat(textes)
+            caption_tensor = text
 
             return img_tensor, caption_tensor
         except (
