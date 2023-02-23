@@ -16,8 +16,8 @@ def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
     #               1 + | b_1 * X | + | b_2 * X^2| + ... + | b_m * X ^m|
 
     c_x = x.to(dtype=torch.float64)
-    weight_denominator = weight_denominator.to(dtype=torch.float64)
-    weight_numerator = weight_numerator.to(dtype=torch.float64)
+    weight_denominator = weight_denominator.to(dtype=c_x.dtype)
+    weight_numerator = weight_numerator.to(dtype=c_x.dtype)
 
     len_num, len_deno = len(weight_numerator), len(weight_denominator)
     post = torch.zeros(len(weight_numerator) -
@@ -26,22 +26,18 @@ def Rational_PYTORCH_A_F(x, weight_numerator, weight_denominator):
 
     singles = z.view(z.shape[-1], 1)
     pre_vander = singles.repeat(
-        1, max(len_num, len_deno)).to(dtype=x.dtype)
+        1, max(len_num, len_deno)).to(dtype=c_x.dtype)
 
     pows = torch.arange(0, max(len_num, len_deno),
-                        device=x.device, dtype=x.dtype)
-
+                        device=x.device, dtype=c_x.dtype)
     vander = torch.pow(pre_vander, pows)
 
     numerator = torch.mul(vander, weight_numerator).sum(-1)
-
     expanded_dw = torch.cat([weight_denominator, post])
 
     denominator = torch.add(
         torch.mul(vander[:, 1:], expanded_dw).abs().sum(-1), 1)
-
     flat_out = torch.div(numerator, denominator)
-
     out = flat_out.view(x.shape).to(dtype=x.dtype)
     return out
 
