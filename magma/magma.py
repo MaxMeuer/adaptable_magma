@@ -126,9 +126,11 @@ class Magma(nn.Module):
                 if config.adapter_config and not config.adapter_config.get('freeze', False):
                     if any(map(name.__contains__, ['adapter', 'switch_logits'])):
                         param.requires_grad = True
+                    else: 
+                        param.requires_grad = False
                 else:
                     param.requires_grad = False
-
+                    
         if config.freeze_img_encoder:
             if config.rational_image_encoder:
                 self.image_prefix.enc = freeze_rational_clip(
@@ -137,19 +139,20 @@ class Magma(nn.Module):
                 for param in self.image_prefix.enc.parameters():
                     param.requires_grad = False
                     
-        for name, param in self.named_parameters():
-            if param.is_contiguous() is False:
-                path, param = name.rsplit(".", 1)
-                path = path.split('.')
-                ref = self
-                while path:
-                    element, path = path[0], path[1:]
-                    if type(ref) in {Sequential, ModuleList}:
-                        ref = ref[int(element)]
-                    else:
-                        ref = getattr(ref, element)
-                setattr(ref, param, Parameter(
-                    getattr(ref, param).contiguous()))
+        # I need this to be able to load the model from a checkpoint
+        # for name, param in self.named_parameters():
+        #     if param.is_contiguous() is False:
+        #         path, param = name.rsplit(".", 1)
+        #         path = path.split('.')
+        #         ref = self
+        #         while path:
+        #             element, path = path[0], path[1:]
+        #             if type(ref) in {Sequential, ModuleList}:
+        #                 ref = ref[int(element)]
+        #             else:
+        #                 ref = getattr(ref, element)
+        #         setattr(ref, param, Parameter(
+        #             getattr(ref, param).contiguous()))
 
     def add_cross_attention_modules(self):
         for l in range(len(self.lm.transformer.h)):
@@ -414,9 +417,10 @@ class Magma(nn.Module):
         sd = torch.load(checkpoint_path, map_location=torch.device("cpu"))
         if "module" in sd.keys():
             sd = sd["module"]
+        distributions = sd.pop("distributions")
 
         print_main(f'loading magma checkpoint from: {checkpoint_path}')
-        model.load_state_dict(sd, strict=False)
+        model.load_state_dict(sd)
         print_main("magma successfully loaded")
 
         model.half()  # .half()  # .eval()  # .to(device).eval()
