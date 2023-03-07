@@ -8,11 +8,10 @@ if torch.cuda.is_available():
         class Rational_CUDA_A_F(torch.autograd.Function):
 
             @staticmethod
-            def forward(ctx, input, weight_numerator, weight_denominator, training):
+            def forward(ctx, input, weight_numerator, weight_denominator):
                 ctx.save_for_backward(
                     input, weight_numerator, weight_denominator)
                 x = forward_A_5_4(input, weight_numerator, weight_denominator)
-
                 return x
 
             @staticmethod
