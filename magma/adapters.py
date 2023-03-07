@@ -92,6 +92,7 @@ class Adapter(nn.Module):
         switch_temp: float = 1.0,
         fixed_idx: int = None,
         use_cuda_kernels: bool = False,
+        tanh_on_switch_logits: bool = False,
     ):
 
         super().__init__()
@@ -110,9 +111,12 @@ class Adapter(nn.Module):
         local_rank, rank, world_size = get_world_info()
         self.local_rank = local_rank
         self.adapter_switch = adapter_switch
+        self.tanh_on_switch_logits = tanh_on_switch_logits
         device = f'cuda:{local_rank}' if local_rank is not None else 'cuda' if torch.cuda.is_available(
         ) else 'cpu'
         self.device = device
+        # self.register_forward_hook(self.forward_hook)
+        # self._features = []
         if adapter_switch:
             self.switch_logits = nn.Parameter(torch.tensor(initial_logits))
 
@@ -128,6 +132,14 @@ class Adapter(nn.Module):
 
         self.adapter.apply(self.init_weights)
 
+    def forward_hook(self, module, input, output):
+        sample_size = [2]
+        g = module.gumbel.sample(sample_size).to(input[0].device)
+
+        weights = torch.softmax(
+            (g + module.switch_logits)/module.switch_temp, dim=-1)
+        module._features.append(weights)
+
     def init_weights(self, m: nn.Module, std=1e-3):
         if isinstance(m, nn.Linear):
             torch.nn.init.normal_(m.weight, std=std)
@@ -139,24 +151,28 @@ class Adapter(nn.Module):
             m.bias.data.zero_()
             m.weight.data.fill_(1.0)
 
-    def train(self, mode: bool = True):
-        if self.adapter_switch:
-            if not mode:
-                self.fixed_idx = torch.argmax(
-                    self.switch_logits, dim=-1).item()
-            else:
-                self.fixed_idx = None
-        return super().train(mode)
+    # def train(self, mode: bool = True):
+    #     if self.adapter_switch:
+    #         if not mode:
+    #             self.fixed_idx = torch.argmax(
+    #                 self.switch_logits, dim=-1).item()
+    #         else:
+    #             self.fixed_idx = None
+    #     return super().train(mode)
 
     def forward(self, x: TensorType["b", "s", "d"]) -> TensorType["b", "s", "d"]:
         if self.adapter_switch:
             output = self.adapter(x)
-
             stacked = torch.stack((output, x), dim=2)
+            if self.tanh_on_switch_logits:
+                return torch.tanh(self.switch_logits[0]) * output + torch.tanh(self.switch_logits[1]) * x
+            if not self.training:
+                y = stacked[:, :, self.fixed_idx, :]
+                return y
+            
 
             batch_size, sequence_length, num_classes, hidden_dim_size = stacked.size()
-            if not self.training:
-                return stacked[:, :, self.fixed_idx, :]
+            
             sample_size = [batch_size, num_classes]
             g = self.gumbel.sample(sample_size).to(
                 device=self.device)
@@ -165,7 +181,6 @@ class Adapter(nn.Module):
                 (g + self.switch_logits)/self.switch_temp, dim=1).to(x.dtype)  # .half()
 
             y = torch.einsum('bsnd, bn -> bsd', stacked, weights)
-
             return y
 
         return self.adapter(x) + x
@@ -182,7 +197,8 @@ class ParallelAdapter(Adapter):
         hidden_act: str = 'relu',
         use_cuda_kernels: bool = False,
         switch_temp: float = 1.0,
-        adapter_switch: bool = True
+        adapter_switch: bool = True, 
+        tanh_on_switch_logits = False
     ):
         super().__init__(
             dim,
@@ -191,7 +207,8 @@ class ParallelAdapter(Adapter):
             hidden_act=hidden_act,
             use_cuda_kernels=use_cuda_kernels,
             switch_temp=switch_temp,
-            adapter_switch=adapter_switch
+            adapter_switch=adapter_switch, 
+            tanh_on_switch_logits=tanh_on_switch_logits
         )
         self.module = module
 
@@ -220,7 +237,8 @@ class ParallelAdapterWrapper(ParallelAdapter):
         hidden_act: str = 'relu',
         use_cuda_kernels: bool = False,
         switch_temp: float = 1.0,
-        adapter_switch: bool = True
+        adapter_switch: bool = True,
+        tanh_on_switch_logits: bool = False
     ):
         super().__init__(
             module,
@@ -231,7 +249,8 @@ class ParallelAdapterWrapper(ParallelAdapter):
             hidden_act=hidden_act,
             use_cuda_kernels=use_cuda_kernels,
             switch_temp=switch_temp,
-            adapter_switch=adapter_switch
+            adapter_switch=adapter_switch,
+            tanh_on_switch_logits=tanh_on_switch_logits
         )
 
     def forward(self, x: TensorType["b", "s", "d"], *attn_args, **attn_kwargs):
@@ -257,6 +276,7 @@ class AdapterWrapper(Adapter):
         switch_temp: float = 1.0,
         adapter_switch: bool = True,
         add_layernorm: bool = False,
+        tanh_on_switch_logits: bool = False
 
     ):
         super().__init__(
@@ -266,7 +286,8 @@ class AdapterWrapper(Adapter):
             hidden_act=hidden_act,
             use_cuda_kernels=use_cuda_kernels,
             switch_temp=switch_temp,
-            adapter_switch=adapter_switch
+            adapter_switch=adapter_switch,
+            tanh_on_switch_logits=tanh_on_switch_logits
         )
 
         self.attn_block = attn_block

@@ -72,19 +72,19 @@ class Magma(nn.Module):
             input_resolution=self.image_prefix.enc.input_resolution,
         )
 
-        for name, param in self.named_parameters():
-            if param.is_contiguous() is False:
-                path, param = name.rsplit(".", 1)
-                path = path.split('.')
-                ref = self
-                while path:
-                    element, path = path[0], path[1:]
-                    if type(ref) in {Sequential, ModuleList}:
-                        ref = ref[int(element)]
-                    else:
-                        ref = getattr(ref, element)
-                setattr(ref, param, Parameter(
-                    getattr(ref, param).contiguous()))
+        # for name, param in self.named_parameters():
+        #     if param.is_contiguous() is False:
+        #         path, param = name.rsplit(".", 1)
+        #         path = path.split('.')
+        #         ref = self
+        #         while path:
+        #             element, path = path[0], path[1:]
+        #             if type(ref) in {Sequential, ModuleList}:
+        #                 ref = ref[int(element)]
+        #             else:
+        #                 ref = getattr(ref, element)
+        #         setattr(ref, param, Parameter(
+        #             getattr(ref, param).contiguous()))
 
         # add cross attention
         if config.cross_attention_config:
@@ -126,11 +126,11 @@ class Magma(nn.Module):
                 if config.adapter_config and not config.adapter_config.get('freeze', False):
                     if any(map(name.__contains__, ['adapter', 'switch_logits'])):
                         param.requires_grad = True
-                    else: 
+                    else:
                         param.requires_grad = False
                 else:
                     param.requires_grad = False
-                    
+
         if config.freeze_img_encoder:
             if config.rational_image_encoder:
                 self.image_prefix.enc = freeze_rational_clip(
@@ -138,7 +138,7 @@ class Magma(nn.Module):
             else:
                 for param in self.image_prefix.enc.parameters():
                     param.requires_grad = False
-                    
+
         # I need this to be able to load the model from a checkpoint
         # for name, param in self.named_parameters():
         #     if param.is_contiguous() is False:
@@ -208,6 +208,8 @@ class Magma(nn.Module):
                         switch_temp=self.config.adapter_config.get(
                             'switch_temp', None),
                         use_cuda_kernels=self.config.use_cuda_kernels,
+                        tanh_on_switch_logits=self.config.adapter_config.get(
+                            'tanh_on_switch_logits', False),
                         **adapter_kwargs,
                     )
                 else:
@@ -221,6 +223,8 @@ class Magma(nn.Module):
                         switch_temp=self.config.adapter_config.get(
                             'switch_temp', None),
                         use_cuda_kernels=self.config.use_cuda_kernels,
+                        tanh_on_switch_logits=self.config.adapter_config.get(
+                            'tanh_on_switch_logits', False),
                         ** adapter_kwargs,
                     )
                     adapter_layer = nn.Sequential(
@@ -247,6 +251,8 @@ class Magma(nn.Module):
                         switch_temp=self.config.adapter_config.get(
                             'switch_temp', None),
                         use_cuda_kernels=self.config.use_cuda_kernels,
+                        tanh_on_switch_logits=self.config.adapter_config.get(
+                            'tanh_on_switch_logits', False),
                         **adapter_kwargs,
                     )
                 else:
@@ -261,6 +267,8 @@ class Magma(nn.Module):
                         switch_temp=self.config.adapter_config.get(
                             'switch_temp', None),
                         use_cuda_kernels=self.config.use_cuda_kernels,
+                        tanh_on_switch_logits=self.config.adapter_config.get(
+                            'tanh_on_switch_logits', False),
                         **adapter_kwargs,
                     )
                 setattr(self.transformer[l], attn_attr, adapter_layer)
