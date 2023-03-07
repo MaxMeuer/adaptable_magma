@@ -7,8 +7,7 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 from torch.cuda import is_available as torch_cuda_available
 from activations import __version__
 import os
-# degrees = [(3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (5, 4), (7, 6)]
-degrees = [(5, 4), (7, 6)]
+degrees = [(3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (5, 4), (7, 6)]
 name = 'activation-functions'
 
 #import ipdb; ipdb.set_trace()

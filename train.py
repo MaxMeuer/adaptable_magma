@@ -170,6 +170,7 @@ if __name__ == "__main__":
     rtpt = RTPT(name_initials='MM', experiment_name='RationalMagma',
                 max_iterations=config.train_steps)
     rtpt.start()
+<<<<<<< HEAD
     wandb_define_metric("train/layer_1_switch_gates1")
     wandb_define_metric("train/last_layer_switch_gates1")
     wandb_define_metric("train/layer_1_switch_gates2")
@@ -177,6 +178,8 @@ if __name__ == "__main__":
     wandb_define_metric("train/lr")
     for n, m in model.named_parameters():
         print(n, m.requires_grad)
+=======
+>>>>>>> 6b00dd64a7105ff6ca00b69047cc706ad3575699
 # %%
     # training loop
     for i in pbar:

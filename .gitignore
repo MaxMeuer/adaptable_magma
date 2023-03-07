@@ -6,6 +6,7 @@ aws*
 magma/datasets/coco_train_val/**
 magma/datasets/coco_converted/**
 *.pt
-magma/model_checkpoints/**
+model_checkpoints/**
 runs/**
 magma/datasets/**
+magma.egg-info/**
