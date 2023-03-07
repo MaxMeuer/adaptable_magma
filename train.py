@@ -6,6 +6,7 @@ from torch.optim import AdamW
 from pathlib import Path
 from magma.config import MultimodalConfig
 from torch.utils.data import random_split, ConcatDataset
+from rtpt import RTPT
 from tensorboardX import SummaryWriter
 
 import wandb
@@ -22,6 +23,7 @@ from magma.utils import (
     wandb_log,
     wandb_init,
     save_model,
+    wandb_define_metric,
     load_model,
     print_main,
     configure_param_groups,
@@ -73,7 +75,7 @@ def get_pretraining_datasets(config, tokenizer, transforms):
     print_main(f"Loaded train dataset with {len(train_dataset)} samples")
     print_main(f"Loaded eval dataset with {len(eval_dataset)} samples")
 
-    return train_dataset, eval_dataset
+    return train_dataset, []
 
 
 # tell tokenizers not to do parallelism
@@ -165,12 +167,22 @@ if __name__ == "__main__":
         name=config.name or wandb.util.generate_id(),
         config=config,
     )
+    rtpt = RTPT(name_initials='MM', experiment_name='RationalMagma',
+                max_iterations=config.train_steps)
+    rtpt.start()
+    wandb_define_metric("train/layer_1_switch_gates1")
+    wandb_define_metric("train/last_layer_switch_gates1")
+    wandb_define_metric("train/layer_1_switch_gates2")
+    wandb_define_metric("train/last_layer_switch_gates2")
+    wandb_define_metric("train/lr")
+    for n, m in model.named_parameters():
+        print(n, m.requires_grad)
 # %%
     # training loop
     for i in pbar:
         if global_step >= config.train_steps:
             break
-
+        rtpt.step()
         # train step
         loss = train_step(config, train_loader, model_engine,
                           scaler)
@@ -185,9 +197,20 @@ if __name__ == "__main__":
                 if lr_scheduler is not None
                 else config.lr
             )
-            to_log = {"train/loss": loss, "train/lr": current_lr}
-            # writer.add_scalar("train/loss", loss, global_step)
-            # write_tensorboard(model, writer, step=global_step)
+
+            l1_switch1 = model.lm.transformer.h[0].mlp[1].switch_logits[0].item(
+            )
+            l1_switch2 = model.lm.transformer.h[0].mlp[1].switch_logits[1].item(
+            )
+            last_switch1 = model.lm.transformer.h[len(
+                model.lm.transformer.h)-1].mlp[1].switch_logits[0].item()
+            last_switch2 = model.lm.transformer.h[len(
+                model.lm.transformer.h)-1].mlp[1].switch_logits[1].item()
+
+            to_log = {"train/loss": loss, "train/lr": current_lr,
+                      "train/layer_1_switch_gates1": l1_switch1, "train/layer_1_switch_gates2": l1_switch2,
+                      "train/last_layer_switch_gates1": last_switch1, "train/last_layer_switch_gates2": last_switch2}
+
             wandb_log(to_log, step=global_step)
 
         # Evaluation phase

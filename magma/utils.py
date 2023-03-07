@@ -106,6 +106,11 @@ def wandb_log(*args, **kwargs):
         wandb.log(*args, **kwargs)
 
 
+def wandb_define_metric(*args, **kwargs):
+    if is_main():
+        wandb.define_metric(*args, **kwargs)
+
+
 def wandb_init(*args, **kwargs):
     if is_main():
         wandb.init(*args, **kwargs)
