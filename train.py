@@ -6,6 +6,7 @@ from torch.optim import AdamW
 from pathlib import Path
 from magma.config import MultimodalConfig
 from torch.utils.data import random_split, ConcatDataset
+from rtpt import RTPT
 from tensorboardX import SummaryWriter
 
 import wandb
@@ -73,7 +74,7 @@ def get_pretraining_datasets(config, tokenizer, transforms):
     print_main(f"Loaded train dataset with {len(train_dataset)} samples")
     print_main(f"Loaded eval dataset with {len(eval_dataset)} samples")
 
-    return train_dataset, eval_dataset
+    return train_dataset, []
 
 
 # tell tokenizers not to do parallelism
@@ -165,12 +166,15 @@ if __name__ == "__main__":
         name=config.name or wandb.util.generate_id(),
         config=config,
     )
+    rtpt = RTPT(name_initials='MM', experiment_name='RationalMagma',
+                max_iterations=config.train_steps)
+    rtpt.start()
 # %%
     # training loop
     for i in pbar:
         if global_step >= config.train_steps:
             break
-
+        rtpt.step()
         # train step
         loss = train_step(config, train_loader, model_engine,
                           scaler)
