@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from torchtyping import TensorType
 from typing import Union, List
+import seaborn as sns
 
 
 def top_p_filter(logits: TensorType[..., "vocab"], threshold: float = 0.9):
@@ -74,7 +75,8 @@ def generate(
 
     # init output with image tokens
     # .to(model.device) + model.image_token
-    out = torch.zeros((b, s), dtype=torch.long).to(model.device) + model.image_token
+    out = torch.zeros((b, s), dtype=torch.long).to(
+        embeddings.device) + model.image_token
 
     # do sampling
     for i in range(max_steps):
@@ -91,9 +93,7 @@ def generate(
                 input_ids=out[:, -1:], use_cache=True, past_key_values=past_key_values
             )
 
-        print('outputs', outputs.logits.device)
         logits = outputs.logits[:, -1, :].float()
-        print('logits', logits.device)
         past_key_values = outputs.past_key_values
 
         # filter / temperature sample
@@ -104,7 +104,6 @@ def generate(
                 logits = top_k_filter(logits, k=top_k)
             if top_p > 0:
                 logits = top_p_filter(logits, threshold=top_p)
-
             probs = F.softmax(logits / temperature, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
 
