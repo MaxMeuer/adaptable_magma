@@ -58,8 +58,9 @@ class PerceiverResampler(nn.Module):
         super().__init__()
         self.register_parameter("learned_latents", nn.Parameter(
             torch.randn(n_latents, token_dim)))
-        self.register_parameter('time_embeddings', nn.Parameter(
-            torch.rand(time, 1, token_dim)))
+        assert time == 1 #not sure what time embeddings is
+        #self.register_parameter('time_embeddings', nn.Parameter(
+        #    torch.rand(time, 1, token_dim)))
         self.flatten = torch.nn.Flatten()
         self.perceiver_attention_layers = nn.ModuleList([])
         for _ in range(num_layers):
@@ -75,14 +76,16 @@ class PerceiverResampler(nn.Module):
             x = x[:, None, None, :, :]
 
         batch_size, number_of_images, sequence_length, token_dim = x.size()
+        #print("here ", batch_size, number_of_images, sequence_length, token_dim)
         # x = rearrange(x, "b n s d -> b n s d")
         latents = self.learned_latents.repeat(
             batch_size, number_of_images, 1, 1)
-        x = x + self.time_embeddings[:number_of_images]
+        #TODO
+        #x = x + self.time_embeddings[:number_of_images]
 
         for att_module, ff_layer in self.perceiver_attention_layers:
-            latents = att_module(latents, x)
-            latents = ff_layer(latents)
+            latents = latents+ att_module(latents, x)
+            latents = latents+ ff_layer(latents)
 
         return self.normalize(latents)
 

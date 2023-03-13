@@ -47,8 +47,9 @@ class MaskedCrossAttention(nn.Module):
         text_token_dim: int = 4096,
         visual_token_dim: int = 2048,
         num_heads: int = 8,
-        n_latents: int = 64, 
-        head_dim: int = 64, 
+        n_latents: int = 64,
+        head_dim: int = 64,
+        few_shot: int = 1,
 
     ):
         super().__init__()
@@ -57,7 +58,9 @@ class MaskedCrossAttention(nn.Module):
         self.num_heads = num_heads
         self.temp = 1 / (head_dim ** -0.5)
         self.softmax = nn.Softmax(dim=-1)
-        
+
+        self.few_shot = few_shot
+        self.n_latents = n_latents
 
 
         self.v_k_w = nn.Linear(
@@ -77,7 +80,7 @@ class MaskedCrossAttention(nn.Module):
         q = self.q_w(y)
         q, k, v = rearrange_many((q, k, v), 'b n (h d) -> b h n d', h=8)
         sim = einsum('... i d, ... j d -> ... i j', q, k)
-        media_time = torch.arange(3).to(self.device) + 1
+        media_time = torch.arange(self.few_shot).to(self.device) + 1 #TODO: PARAMETERS NOT SET FROM CONFIG HERE
         text_to_media_mask = rearrange(media_mask, 'b i -> b 1 i 1') == repeat(media_time, 'j -> 1 1 1 (j m)', m=64)
         sim = sim.masked_fill(~text_to_media_mask, -torch.finfo(sim.dtype).max)
         logits = sim.softmax(dim=-1)
@@ -96,7 +99,8 @@ class GatedCrossAttentionBlock(nn.Module):
         self.x_attn = MaskedCrossAttention(
             text_token_dim = text_token_dim,
             visual_token_dim=visual_token_dim ,
-            n_latents = config['n_latents']
+            n_latents = config.cross_attention_config['n_latents'],
+            few_shot=config.few_shot
             )
         self.tanh1 = nn.Parameter(torch.tensor([0.]))
         self.ffw = FeedForward(dim=text_token_dim)
@@ -110,7 +114,7 @@ class GatedCrossAttentionBlock(nn.Module):
         x_attn = self.x_attn(self.visual_features, embs, self.media_mask)
         attn_out = embs +  x_attn
         # attn_out = embs + tanh(self.tanh1) * x_attn
-        x_ffw = attn_out + self.ffw(attn_out) 
+        x_ffw = attn_out + self.ffw(attn_out)
         # x_ffw = attn_out + self.ffw(attn_out) * (tanh(self.tanh2))
 
         return x_ffw
