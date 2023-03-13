@@ -98,6 +98,7 @@ class Magma(nn.Module):
             self.perceiver_resampler = PerceiverResampler(
                 self.image_prefix.encoder_out_dim,
                 n_latents=config.cross_attention_config['n_latents'],
+                num_layers=config.cross_attention_config["num_layers"]
             )
 
             self.add_cross_attention_modules()
@@ -130,15 +131,15 @@ class Magma(nn.Module):
                 if config.adapter_config and not config.adapter_config.get('freeze', False):
                     if any(map(name.__contains__, ['adapter', 'switch_logits', "gated_x_attn"])):
                         param.requires_grad = True
-                    else: 
+                    else:
                         param.requires_grad = False
                 else:
-                    if any(map(name.__contains__, ["ln_1.1."])): 
+                    if any(map(name.__contains__, ["ln_1.1."])):
                         param.requires_grad = True
                     else:
                         param.requires_grad = False
 
-                    
+
         if config.freeze_img_encoder:
             if config.rational_image_encoder:
                 self.image_prefix.enc = freeze_rational_clip(
@@ -146,7 +147,7 @@ class Magma(nn.Module):
             else:
                 for param in self.image_prefix.enc.parameters():
                     param.requires_grad = False
-                    
+
         # I need this to be able to load the model from a checkpoint
         # for name, param in self.named_parameters():
         #     if param.is_contiguous() is False:
@@ -166,10 +167,10 @@ class Magma(nn.Module):
         for l in range(len(self.lm.transformer.h)):
             if l % self.config.cross_attention_config['cadence'] != 0:
                 continue
-            
+
             pretrained_block = getattr(self.lm.transformer.h[l], "ln_1")
             x_attn_block = GatedCrossAttentionBlock(
-                config=self.config.cross_attention_config,
+                config=self.config,
                 text_token_dim=self.lm.config.hidden_size,
                 visual_token_dim=self.image_prefix.encoder_out_dim
             )
@@ -362,15 +363,23 @@ class Magma(nn.Module):
             captions.shape[1] == self.seq_len
         ), f"in training, captions should be padded to sequence length ({self.seq_len}), but are length {captions.shape[1]}"
 
+        #print("input" , images.shape, captions.shape)
+        #print("captions"  , captions.shape)
+
         if input_embeddings is None:
             input_embeddings = self.image_prefix(images)
-            input_embeddings = rearrange(   
+            input_embeddings = rearrange(
                 input_embeddings, '(b n) s d -> b n s d', n=self.config.few_shot)
+
+        #print("embeds", input_embeddings.shape)
 
         word_embeddings = self.word_embedding(captions)
         labels = build_labels(
             input_embeddings, captions, self.eos_token
         )
+        #import pdb
+        #pdb.set_trace()
+        #print("labels", labels.shape)
 
         if self.config.cross_attention_config is not None:
 
@@ -380,6 +389,13 @@ class Magma(nn.Module):
             visual_features = self.perceiver_resampler(
                 input_embeddings
             )
+
+            labels = torch.clone(captions)
+            for label in labels:
+                for k, token in enumerate(label):
+                    if token == self.eos_token:
+                        label[k + 1:] = -100
+                        break
 
             for l in self.cross_attention_layers:
                 x_attn_block = getattr(self.transformer[l], 'ln_1')[1]
