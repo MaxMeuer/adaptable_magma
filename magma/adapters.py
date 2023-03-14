@@ -150,7 +150,7 @@ class Adapter(nn.Module):
 
     def forward(self, x: TensorType["b", "s", "d"]) -> TensorType["b", "s", "d"]:
         if self.adapter_switch:
-            output = self.adapter(x)
+            output = self.adapter(x)+x
 
             stacked = torch.stack((output, x), dim=2)
 
@@ -182,7 +182,8 @@ class ParallelAdapter(Adapter):
         hidden_act: str = 'relu',
         use_cuda_kernels: bool = False,
         switch_temp: float = 1.0,
-        adapter_switch: bool = True
+        adapter_switch: bool = True,
+
     ):
         super().__init__(
             dim,
@@ -246,6 +247,7 @@ class ParallelAdapterWrapper(ParallelAdapter):
 
 class AdapterWrapper(Adapter):
     # used to add an adapter to the attention block
+    # sequential can't be nested..
 
     def __init__(
         self,
@@ -257,6 +259,7 @@ class AdapterWrapper(Adapter):
         switch_temp: float = 1.0,
         adapter_switch: bool = True,
         add_layernorm: bool = False,
+        initial_logits=[0.5, 0.5],  # : list[float] = [0.5, 0.5],
 
     ):
         super().__init__(
@@ -266,7 +269,9 @@ class AdapterWrapper(Adapter):
             hidden_act=hidden_act,
             use_cuda_kernels=use_cuda_kernels,
             switch_temp=switch_temp,
-            adapter_switch=adapter_switch
+            adapter_switch=adapter_switch,
+            initial_logits=initial_logits,  # : list[float] = [0.5, 0.5],
+
         )
 
         self.attn_block = attn_block
@@ -277,5 +282,27 @@ class AdapterWrapper(Adapter):
             attn_outputs[0],
             attn_outputs[1:],
         )  # output_attn: a, present, (attentions)
+
         hidden_states = self.adapter(attn_output) + attn_output
+
+        if self.adapter_switch:
+            #output = self.adapter(attn_output)
+            #full_output = torch.tensor((hidden_states,) + outputs)
+
+            stacked = torch.stack((hidden_states, attn_output), dim=2)
+
+            batch_size, sequence_length, num_classes, hidden_dim_size = stacked.size()
+            if not self.training:
+                return stacked[:, :, self.fixed_idx, :]
+            sample_size = [batch_size, num_classes]
+            g = self.gumbel.sample(sample_size).to(
+                device=self.device)
+
+            weights = torch.softmax(
+                (g + self.switch_logits)/self.switch_temp, dim=1).to(x.dtype)  # .half()
+
+            y = torch.einsum('bsnd, bn -> bsd', stacked, weights)
+
+            return (y,) + outputs
+
         return (hidden_states,) + outputs

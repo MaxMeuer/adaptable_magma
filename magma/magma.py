@@ -113,6 +113,7 @@ class Magma(nn.Module):
                     adapter_type=mlp_config.pop("adapter_type"),
                     downsample_factor=mlp_config.pop(
                         "downsample_factor", 4),
+                    initial_logits=config.adapter_config['initial_logits'],
                     **mlp_config,
                 )
             attn_config = deepcopy(
@@ -122,6 +123,9 @@ class Magma(nn.Module):
                 self.add_adapters(
                     location="attention",
                     adapter_type=attn_config.pop("adapter_type"),
+                    downsample_factor=attn_config.pop(
+                        "downsample_factor", 4),
+                    initial_logits=config.adapter_config['initial_logits'],
                     **attn_config,
                 )
 
@@ -188,6 +192,7 @@ class Magma(nn.Module):
         location: Literal["mlp", "attention"] = "mlp",
         ff_attr: str = "mlp",
         attn_attr: str = "attn",
+        initial_logits: list = [0.5,0.5],
 
         **adapter_kwargs,
     ):
@@ -234,6 +239,7 @@ class Magma(nn.Module):
                             'adapter_switch', False),
                         switch_temp=self.config.adapter_config.get(
                             'switch_temp', None),
+                        initial_logits=initial_logits,
                         use_cuda_kernels=self.config.use_cuda_kernels,
                         ** adapter_kwargs,
                     )
@@ -268,6 +274,7 @@ class Magma(nn.Module):
                         attn_block=attn,
                         dim=self.lm.config.hidden_size,
                         downsample_factor=downsample_factor,
+                        initial_logits=initial_logits,
                         hidden_act=self.config.adapter_config.get(
                             'hidden_act', False),
                         adapter_switch=self.config.adapter_config.get(
@@ -277,6 +284,7 @@ class Magma(nn.Module):
                         use_cuda_kernels=self.config.use_cuda_kernels,
                         **adapter_kwargs,
                     )
+
                 setattr(self.transformer[l], attn_attr, adapter_layer)
 
         if location == "mlp":
@@ -363,23 +371,16 @@ class Magma(nn.Module):
             captions.shape[1] == self.seq_len
         ), f"in training, captions should be padded to sequence length ({self.seq_len}), but are length {captions.shape[1]}"
 
-        #print("input" , images.shape, captions.shape)
-        #print("captions"  , captions.shape)
-
         if input_embeddings is None:
             input_embeddings = self.image_prefix(images)
             input_embeddings = rearrange(
                 input_embeddings, '(b n) s d -> b n s d', n=self.config.few_shot)
 
-        #print("embeds", input_embeddings.shape)
 
         word_embeddings = self.word_embedding(captions)
         labels = build_labels(
             input_embeddings, captions, self.eos_token
         )
-        #import pdb
-        #pdb.set_trace()
-        #print("labels", labels.shape)
 
         if self.config.cross_attention_config is not None:
 
@@ -410,12 +411,13 @@ class Magma(nn.Module):
             )
 
         else:
+            assert input_embeddings.shape[1]==1, "no few shot like this here, honeh!"
 
             # forward joined embeddings through lm
             input_embeddings = torch.cat(
                 (
-                    input_embeddings,
-                    word_embeddings[:, : -input_embeddings.shape[1], :],
+                    input_embeddings[:, 0, :, :],
+                    word_embeddings[:, : -input_embeddings.shape[2], :],
                 ),  # remove padding in the word embedding before concatenating
                 dim=1,
             )

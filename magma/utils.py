@@ -205,8 +205,13 @@ def configure_param_groups(model, config):
         model.image_prefix.proj, config
     )
 
-    perceiver_params = get_params_for_weight_decay_optimization(
-        model.perceiver_resampler, config)
+    print(config.cross_attention_config)
+    if config.cross_attention_config:
+        perceiver_params = get_params_for_weight_decay_optimization(
+            model.perceiver_resampler, config)
+    else:
+        perceiver_params = []
+
     # get the params for layernorm if it exists
     if config.use_image_embed_layernorm:
         image_ln_params = get_params_for_weight_decay_optimization(
@@ -227,7 +232,7 @@ def configure_param_groups(model, config):
             lm_list.append(param)
 
     lm_params = get_params_for_weight_decay_optimization(lm_list, config)
-    
+
     rationals_params = get_params_for_weight_decay_optimization(
         rationals_list, config)
     switch_params = get_params_for_weight_decay_optimization(
@@ -244,7 +249,7 @@ def configure_param_groups(model, config):
     if config.switch_lr is not None:
         for pdict in switch_params:
             pdict["lr"] = config.switch_lr
-            
+
     if config.perceiver_lr is not None:
         for pdict in perceiver_params:
             pdict["lr"] = config.perceiver_lr
