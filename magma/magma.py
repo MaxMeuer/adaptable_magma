@@ -283,20 +283,22 @@ class Magma(nn.Module):
         Expects a list of strings and instances of ImageInput
         Converts them into a list of tensors and then optionally runs self.embed over it
         """
+        output_list = []
         for i in range(len(input_list)):
             inp = input_list[i]
             if isinstance(inp, str):
-                input_list[i] = self.tokenizer.encode(inp, return_tensors="pt")
+                output_list.append(self.tokenizer.encode(
+                    inp, return_tensors="pt"))
             elif isinstance(inp, ImageInput):
-                input_list[i] = inp.get_transformed_image(
-                    transform_fn=self.transforms)
+                output_list.append(inp.get_transformed_image(
+                    transform_fn=self.transforms))
             else:
                 raise Exception(f'Invalid input type:{type(inp)}')
 
         if embed == True:
-            return self.embed(input_list)
+            return self.embed(output_list)
         else:
-            return input_list
+            return output_list
 
     def embed(self, inputs: List[torch.Tensor]) -> TensorType["b", "s", "d"]:
         """
@@ -348,7 +350,12 @@ class Magma(nn.Module):
         output_hidden_states: bool = False,
         input_embeddings: TensorType["b", 'n', 't', "s", "d"] = None,
     ) -> ModelOutput:
-
+        if captions is None:
+            lm_outputs = self.lm(
+                inputs_embeds=input_embeddings,
+                output_hidden_states=True,
+            )
+            return lm_outputs
         assert captions is not None, "Must provide captions in training"
         assert any([i is not None for i in [images, input_embeddings]]) and not all(
             [i is not None for i in [images, input_embeddings]]
@@ -360,8 +367,8 @@ class Magma(nn.Module):
         if input_embeddings is None:
             input_embeddings = self.image_prefix(images)
 
-        if images.dim == 5:
-            images = images[:, :, None, :, :, :]  # Add Times Dimension
+        # if images.dim == 5:
+        #     images = images[:, :, None, :, :, :]  # Add Times Dimension
 
         word_embeddings = self.word_embedding(captions)
 
@@ -425,11 +432,11 @@ class Magma(nn.Module):
         sd = torch.load(checkpoint_path, map_location=torch.device("cpu"))
         if "module" in sd.keys():
             sd = sd["module"]
-        distributions = sd.pop("distributions")
+        distributions = sd.pop("distributions", None)
 
         print_main(f'loading magma checkpoint from: {checkpoint_path}')
         model.load_state_dict(sd)
         print_main("magma successfully loaded")
 
-        model.half()  # .half()  # .eval()  # .to(device).eval()
+        model.half()  # .eval()  # .to(device).eval()
         return model
