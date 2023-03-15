@@ -1,5 +1,5 @@
 import torch
-from transformers import GPTNeoForCausalLM, AutoConfig, GPT2LMHeadModel, AutoModelForCausalLM, GPTJForCausalLM, GPTJConfig
+from transformers import AutoConfig, AutoModelForCausalLM, GPTJConfig
 from .utils import print_main
 from pathlib import Path
 from magma.config import MultimodalConfig
@@ -24,6 +24,12 @@ def get_gptj(config: MultimodalConfig,
         gptj_config.use_cache = False
 
     if config.deepspeed_config_params['fp16']['enabled'] is True:
+        if config.chefer:
+            print("Using Chefer GPT-J")
+            from .gpt_j_chefer.modeling_gptj import GPTJForCausalLM
+        else:
+            from transformers import GPTJForCausalLM
+
         assert isinstance(
             gptj_config, GPTJConfig), "GPT Version must be GPT-J if fp16 is enabled"
         model = GPTJForCausalLM.from_pretrained(
