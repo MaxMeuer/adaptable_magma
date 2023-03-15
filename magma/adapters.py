@@ -162,24 +162,22 @@ class Adapter(nn.Module):
 
     def forward(self, x: TensorType["b", "s", "d"]) -> TensorType["b", "s", "d"]:
         if self.adapter_switch:
-            output = self.adapter(x)
+            output = self.adapter(x) + x
             stacked = torch.stack((output, x), dim=2)
             if self.tanh_on_switch_logits:
-                return torch.tanh(self.switch_logits[0]) * output + torch.tanh(self.switch_logits[1]) * x
-            if not self.training:
+                return torch.tanh(self.switchs_logits[0]) * output + torch.tanh(self.switch_logits[1]) * x
+            if not self.training and self.fixed_idx is not None:
                 y = stacked[:, :, self.fixed_idx, :]
                 return y
-            
 
             batch_size, sequence_length, num_classes, hidden_dim_size = stacked.size()
-            
+
             sample_size = [batch_size, num_classes]
             g = self.gumbel.sample(sample_size).to(
                 device=self.device)
 
             weights = torch.softmax(
                 (g + self.switch_logits)/self.switch_temp, dim=1).to(x.dtype)  # .half()
-
             y = torch.einsum('bsnd, bn -> bsd', stacked, weights)
             return y
 
@@ -197,8 +195,8 @@ class ParallelAdapter(Adapter):
         hidden_act: str = 'relu',
         use_cuda_kernels: bool = False,
         switch_temp: float = 1.0,
-        adapter_switch: bool = True, 
-        tanh_on_switch_logits = False
+        adapter_switch: bool = True,
+        tanh_on_switch_logits=False
     ):
         super().__init__(
             dim,
@@ -207,7 +205,7 @@ class ParallelAdapter(Adapter):
             hidden_act=hidden_act,
             use_cuda_kernels=use_cuda_kernels,
             switch_temp=switch_temp,
-            adapter_switch=adapter_switch, 
+            adapter_switch=adapter_switch,
             tanh_on_switch_logits=tanh_on_switch_logits
         )
         self.module = module
