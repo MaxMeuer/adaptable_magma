@@ -51,6 +51,10 @@ class MultimodalConfig:
     initial_scale_power: int = 16
     load_from_fp32_weights: int = False
 
+    # Chefer:
+    # ------------------------------------------------------------
+    chefer: bool = False
+
     # Checkpointing:
     # ------------------------------------------------------------
     save_every: int = 500
