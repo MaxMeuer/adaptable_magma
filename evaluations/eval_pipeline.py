@@ -37,7 +37,7 @@ def get_coco_path(dir, id, mode=None, year=2014):
 
 
 def create_prompt(question, answer=None):
-    return f'Question: {question} Answer:' if answer is None else f'Question: {question} Answer: {answer}'
+    return f'Q: {question} A:' if answer is None else f'Q: {question} A: {answer}'
 
 
 class Evaluator:
@@ -81,10 +81,6 @@ class Evaluator:
 
             for sample in few_shots:
                 few_shot_question_index = sample['question_id']
-
-                if not few_shot_question_index in answers:
-                    print('Not Found')
-                    continue
                 few_shot_image_path = get_coco_path(
                     f'{self.args.coco_path}/{coco_path}', sample['image_id'], mode='val', year=year)
                 few_shot_image = ImageInput(few_shot_image_path)
@@ -119,17 +115,19 @@ class Evaluator:
 
     def eval_vqa_predicitions(self, predictions, answers):
         accQA = []
+        vqa_eval = {}
         for a in answers['annotations']:
             if a['question_id'] not in predictions:
                 continue
-
+            vqa_eval[a['question_id']] = {"question_id": a['question_id'],
+                                          "answer": predictions[a['question_id']], "gtAnswers": a['answers']}
             vqa_acc = self.get_vqa_accuracy(
                 predictions[a['question_id']], a['answers'])
 
             accQA.append(vqa_acc)
         final_acc = float(sum(accQA))/len(accQA)
 
-        return final_acc
+        return final_acc, vqa_eval
 
     def generate_gqa(self, question_path, image_path):
         questions = json.load(open(question_path))
@@ -238,7 +236,7 @@ if __name__ == "__main__":
         indexed_vqa = index_vqa(vqa_answers)
         vqa_predictions = experiment.generate_vqa(
             question_path=f'{args.dataset_path}/VQA/v2_OpenEnded_mscoco_val2014_questions.json', coco_path="val2014", answers=indexed_vqa)
-        vqa_acc = experiment.eval_vqa_predicitions(
+        vqa_acc, vqa_res = experiment.eval_vqa_predicitions(
             vqa_predictions, vqa_answers)
         print(
             f'Accuracy for VQA of Model {args.model_path}: {vqa_acc}')
@@ -250,7 +248,7 @@ if __name__ == "__main__":
         indexed_answers_okvqa = index_vqa(okvqa_answers)
         okvqa_predictions = experiment.generate_vqa(
             question_path=f'{args.dataset_path}/OK_VQA/OpenEnded_mscoco_val2014_questions.json', coco_path="val2014", answers=indexed_answers_okvqa)
-        okvqa_acc = experiment.eval_vqa_predicitions(
+        okvqa_acc, _ = experiment.eval_vqa_predicitions(
             okvqa_predictions, okvqa_answers)
         print(
             f'Accuracy for OKVQA of Model {args.model_path}: {okvqa_acc}')
@@ -270,9 +268,14 @@ if __name__ == "__main__":
         vizwiz_acc = experiment.eval_vizwiz(vizwiz_predictions)
         print(
             f'Accuracy for vizwiz_acc of Model {args.model_path}: {vizwiz_acc}')
-        rtpt.step()
+        rtpt.step
+
     dic = json.dumps({'vqa': vqa_acc, 'okvqa': okvqa_acc,
                       'gqa': gqa_acc, 'vizwiz': vizwiz_acc})
-    with open(f"acc_{args.model_path}_shots{args.few_shot}_focused_{args.aa_focused}_samples_{args.num_samples}.json", "w") as outfile:
+    res = json.dumps(vqa_res)
+
+    with open(f"output/res_{args.model_path.split('/')[-1][:-3]}_shots{args.few_shot}_focused_{args.aa_focused}_samples_{args.num_samples}.json", "w") as outfile:
+        outfile.write(res)
+    with open(f"results/acc_{args.model_path.split('/')[-1][:-3]}_shots_{args.few_shot}_focused_{args.aa_focused}_samples_{args.num_samples}.json", "w") as outfile:
         outfile.write(dic)
 # %%
