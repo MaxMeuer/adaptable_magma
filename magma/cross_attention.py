@@ -44,9 +44,9 @@ class FeedForward(nn.Module):
 class MaskedCrossAttention(nn.Module):
     def __init__(
         self,
-        text_token_dim: int = 4096,
+        text_token_dim: int = 2048,
         visual_token_dim: int = 2048,
-        num_heads: int = 8,
+        num_heads: int = 16,
         n_latents: int = 64,
         head_dim: int = 64,
         few_shot: int = 1,
@@ -81,7 +81,7 @@ class MaskedCrossAttention(nn.Module):
         q, k, v = rearrange_many((q, k, v), 'b n (h d) -> b h n d', h=8)
         sim = einsum('... i d, ... j d -> ... i j', q, k)
         media_time = torch.arange(self.few_shot).to(self.device) + 1 #TODO: PARAMETERS NOT SET FROM CONFIG HERE
-        text_to_media_mask = rearrange(media_mask, 'b i -> b 1 i 1') == repeat(media_time, 'j -> 1 1 1 (j m)', m=64)
+        text_to_media_mask = rearrange(media_mask, 'b i -> b 1 i 1') == repeat(media_time, 'j -> 1 1 1 (j m)', m=self.n_latents)
         sim = sim.masked_fill(~text_to_media_mask, -torch.finfo(sim.dtype).max)
         logits = sim.softmax(dim=-1)
         text_without_media_mask = media_mask == 0
@@ -113,8 +113,9 @@ class GatedCrossAttentionBlock(nn.Module):
     def forward(self, embs: TensorType["Batch", "Sequence Length", "TokenDim"]):
         x_attn = self.x_attn(self.visual_features, embs, self.media_mask)
         attn_out = embs +  x_attn
-        # attn_out = embs + tanh(self.tanh1) * x_attn
         x_ffw = attn_out + self.ffw(attn_out)
-        # x_ffw = attn_out + self.ffw(attn_out) * (tanh(self.tanh2))
+        #mode 2: with tanh below
+        #attn_out = embs + tanh(self.tanh1) * x_attn
+        #x_ffw = attn_out + self.ffw(attn_out) * (tanh(self.tanh2))
 
         return x_ffw
