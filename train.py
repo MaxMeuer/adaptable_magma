@@ -75,7 +75,7 @@ def get_pretraining_datasets(config, tokenizer, transforms):
     print_main(f"Loaded train dataset with {len(train_dataset)} samples")
     print_main(f"Loaded eval dataset with {len(eval_dataset)} samples")
 
-    return train_dataset, []
+    return train_dataset, eval_dataset
 
 
 # tell tokenizers not to do parallelism
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     if config.dtype:
         dtype = cast_dtype(config.dtype)
         # torch.set_default_dtype(dtype)
-    #writer = SummaryWriter()
+    # writer = SummaryWriter()
     if config.from_checkpoint:
         print("FROM CHECKPOINT")
 
@@ -167,22 +167,23 @@ if __name__ == "__main__":
         name=config.name or wandb.util.generate_id(),
         config=config,
     )
+
     rtpt = RTPT(name_initials='MM', experiment_name='RationalMagma',
                 max_iterations=config.train_steps)
+
     rtpt.start()
-<<<<<<< HEAD
-    wandb_define_metric("train/layer_1_switch_gates1")
-    wandb_define_metric("train/last_layer_switch_gates1")
-    wandb_define_metric("train/layer_1_switch_gates2")
-    wandb_define_metric("train/last_layer_switch_gates2")
+    # wandb_define_metric("train/layer_1_switch_gates1")
+    # wandb_define_metric("train/Attn_Switch_First")
+    # wandb_define_metric("train/layer_1_switch_gates2")
+    # wandb_define_metric("train/Attn_Switch_last")
     wandb_define_metric("train/lr")
-    for n, m in model.named_parameters():
-        print(n, m.requires_grad)
-=======
->>>>>>> 6b00dd64a7105ff6ca00b69047cc706ad3575699
+    # wandb_define_metric("train/some_attn_weight")
+    # wandb_define_metric("train/some_MLP_weight")
+
 # %%
     # training loop
     for i in pbar:
+
         if global_step >= config.train_steps:
             break
         rtpt.step()
@@ -201,20 +202,24 @@ if __name__ == "__main__":
                 else config.lr
             )
 
-            l1_switch1 = model.lm.transformer.h[0].mlp[1].switch_logits[0].item(
-            )
-            l1_switch2 = model.lm.transformer.h[0].mlp[1].switch_logits[1].item(
-            )
-            last_switch1 = model.lm.transformer.h[len(
-                model.lm.transformer.h)-1].mlp[1].switch_logits[0].item()
-            last_switch2 = model.lm.transformer.h[len(
-                model.lm.transformer.h)-1].mlp[1].switch_logits[1].item()
-
-            to_log = {"train/loss": loss, "train/lr": current_lr,
-                      "train/layer_1_switch_gates1": l1_switch1, "train/layer_1_switch_gates2": l1_switch2,
-                      "train/last_layer_switch_gates1": last_switch1, "train/last_layer_switch_gates2": last_switch2}
-
-            wandb_log(to_log, step=global_step)
+            # l1_switch1 = model.lm.transformer.h[0].mlp[1].switch_logits[0].item(
+            # )
+            # l1_switch2 = model.lm.transformer.h[0].mlp[1].switch_logits[1].item(
+            # )
+            # last_switch1 = model.lm.transformer.h[len(
+            #     model.lm.transformer.h)-1].attn.switch_logits[0].item()
+            # last_switch2 = model.lm.transformer.h[len(
+            #     model.lm.transformer.h)-1].attn.switch_logits[1].item()
+            # some_attn_weight = model.lm.transformer.h[0].attn.adapter[0].weight[0][0].item(
+            # )
+            # some_mlp_weight = model.lm.transformer.h[0].mlp[1].adapter[0].weight[0][0].item(
+            # )
+            # to_log = {"train/loss": loss, "train/lr": current_lr,
+            #           "train/layer_1_switch_gates1": l1_switch1, "train/layer_1_switch_gates2": l1_switch2,
+            #           "train/Attn_Switch_First": last_switch1, "train/Attn_Switch_last": last_switch2,
+            #           'train/some_attn_weight': some_attn_weight, 'some_mlp_weight': some_mlp_weight}
+            to_log={"train/loss": loss, "train/lr": current_lr}
+            wandb_log(to_log, step = global_step)
 
         # Evaluation phase
         if (global_step % config.eval_every == 0):
@@ -222,8 +227,8 @@ if __name__ == "__main__":
             with torch.no_grad():
 
                 # eval step:
-                eval_loss = eval_step(
-                    config, eval_loader, model_engine, device=torch.device("cuda", args.local_rank))
+                eval_loss=eval_step(
+                    config, eval_loader, model_engine, device = torch.device("cuda", args.local_rank))
                 pbar.set_description(
                     f"eval... Step: {global_step} Loss: {eval_loss}")
                 # wandb_log({"eval/loss": eval_loss}, step=global_step)
