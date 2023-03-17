@@ -217,21 +217,28 @@ def configure_param_groups(model, config):
 
     # get the params for the lm
     rationals_list = torch.nn.ParameterList([])
-    switch_list = torch.nn.ParameterList([])
+    mlp_switch_list = torch.nn.ParameterList([])
+    attn_switch_list = torch.nn.ParameterList([])
     lm_list = torch.nn.ParameterList([])
     for name, param in model.lm.named_parameters():
         if any(map(name.__contains__, ['numerator', 'denominator'])):
             rationals_list.append(param)
         elif any(map(name.__contains__, ['switch_logits'])):
-            switch_list.append(param)
+            if 'attn' in name:
+                attn_switch_list.append(param)
+            elif 'mlp' in name:
+                mlp_switch_list.append(param)
+
         else:
             lm_list.append(param)
 
     lm_params = get_params_for_weight_decay_optimization(lm_list, config)
     rationals_params = get_params_for_weight_decay_optimization(
         rationals_list, config)
-    switch_params = get_params_for_weight_decay_optimization(
-        switch_list, config)
+    mlp_switch_params = get_params_for_weight_decay_optimization(
+        mlp_switch_list, config)
+    attn_switch_params = get_params_for_weight_decay_optimization(
+        attn_switch_list, config)
 
     if config.image_enc_lr is not None:
         for pdict in image_enc_params:
@@ -241,9 +248,13 @@ def configure_param_groups(model, config):
         for pdict in rationals_params:
             pdict["lr"] = config.rationals_lr
 
-    if config.switch_lr is not None:
-        for pdict in switch_params:
-            pdict["lr"] = config.switch_lr
+    if config.mlp_switch_lr is not None:
+        for pdict in mlp_switch_params:
+            pdict["lr"] = config.mlp_switch_lr
+
+    if config.attn_switch_lr is not None:
+        for pdict in attn_switch_params:
+            pdict["lr"] = config.attn_switch_lr
 
     # get params for class head if it exists
     class_params = []
@@ -253,7 +264,7 @@ def configure_param_groups(model, config):
         )
 
     all_params = []
-    for p in image_enc_params + lm_params + image_proj_params + rationals_params + switch_params + class_params:
+    for p in image_enc_params + lm_params + image_proj_params + rationals_params + mlp_switch_params + attn_switch_params + class_params:
         if p["params"]:
             all_params.append(p)
     # else:
@@ -481,3 +492,9 @@ def write_tensorboard(model, writer, step):
             weights = param.to('cpu').detach().numpy()
             ax.bar(['Adapter', 'Identity'], weights)
             writer.add_figure(f'{name}', fig, step)
+
+
+def remove_aa(model):
+    for name, module in model.named_modules():
+        if isinstance(module, Adapter):
+            module.remove_aa()
