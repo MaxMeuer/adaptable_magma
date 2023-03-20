@@ -160,12 +160,12 @@ class Adapter(nn.Module):
     #             self.fixed_idx = None
     #     return super().train(mode)
 
-    def forward(self, x: TensorType["b", "s", "d"]) -> TensorType["b", "s", "d"]:
+    def forward(self, x: TensorType["b", "s", "d"], from_where="mlp") -> TensorType["b", "s", "d"]:
         if self.adapter_switch:
             output = self.adapter(x) + x
             stacked = torch.stack((output, x), dim=2)
             if self.tanh_on_switch_logits:
-                return torch.tanh(self.switchs_logits[0]) * output + torch.tanh(self.switch_logits[1]) * x
+                return torch.tanh(self.switch_logits[0]) * output + torch.tanh(self.switch_logits[1]) * x
             if not self.training and self.fixed_idx is not None:
                 y = stacked[:, :, self.fixed_idx, :]
                 return y
@@ -296,5 +296,5 @@ class AdapterWrapper(Adapter):
             attn_outputs[0],
             attn_outputs[1:],
         )  # output_attn: a, present, (attentions)
-        hidden_states = self.adapter(attn_output) + attn_output
+        hidden_states = super().forward(attn_output) + attn_output
         return (hidden_states,) + outputs

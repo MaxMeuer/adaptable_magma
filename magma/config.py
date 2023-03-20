@@ -30,7 +30,8 @@ class MultimodalConfig:
     lr: float = 8.0e-4
     image_enc_lr: float = None
     rationals_lr: float = None
-    switch_lr: float = None
+    mlp_switch_lr: float = None
+    attn_switch_lr: float = None
     min_lr: float = 0.0
     lr_decay_iters: int = None
     gradient_accumulation_steps: int = 1
